@@ -1,49 +1,47 @@
-# gstack — AI Engineering Workflow
+# gstack — AIエンジニアリングワークフロー
 
-gstack is a collection of SKILL.md files that give AI agents structured roles for
-software development. Each skill is a specialist: CEO reviewer, eng manager,
-designer, QA lead, release engineer, debugger, and more.
+gstackは、AIエージェントにソフトウェア開発のための構造化された役割を与えるSKILL.mdファイルのコレクションです。各スキルはそれぞれの専門家です：CEOレビュアー、エンジニアリングマネージャー、デザイナー、QAリード、リリースエンジニア、デバッガーなど。
 
-## Available skills
+## 利用可能なスキル
 
-Skills live in `.agents/skills/`. Invoke them by name (e.g., `/office-hours`).
+スキルは`.agents/skills/`に格納されています。名前で呼び出してください（例：`/office-hours`）。
 
-| Skill | What it does |
-|-------|-------------|
-| `/office-hours` | Start here. Reframes your product idea before you write code. |
-| `/plan-ceo-review` | CEO-level review: find the 10-star product in the request. |
-| `/plan-eng-review` | Lock architecture, data flow, edge cases, and tests. |
-| `/plan-design-review` | Rate each design dimension 0-10, explain what a 10 looks like. |
-| `/design-consultation` | Build a complete design system from scratch. |
-| `/review` | Pre-landing PR review. Finds bugs that pass CI but break in prod. |
-| `/debug` | Systematic root-cause debugging. No fixes without investigation. |
-| `/design-review` | Design audit + fix loop with atomic commits. |
-| `/qa` | Open a real browser, find bugs, fix them, re-verify. |
-| `/qa-only` | Same as /qa but report only — no code changes. |
-| `/ship` | Run tests, review, push, open PR. One command. |
-| `/document-release` | Update all docs to match what you just shipped. |
-| `/retro` | Weekly retro with per-person breakdowns and shipping streaks. |
-| `/browse` | Headless browser — real Chromium, real clicks, ~100ms/command. |
-| `/setup-browser-cookies` | Import cookies from your real browser for authenticated testing. |
-| `/careful` | Warn before destructive commands (rm -rf, DROP TABLE, force-push). |
-| `/freeze` | Lock edits to one directory. Hard block, not just a warning. |
-| `/guard` | Activate both careful + freeze at once. |
-| `/unfreeze` | Remove directory edit restrictions. |
-| `/gstack-upgrade` | Update gstack to the latest version. |
+| スキル | 機能 |
+|-------|------|
+| `/office-hours` | ここから始めましょう。コードを書く前にプロダクトアイデアを再構築します。 |
+| `/plan-ceo-review` | CEO レベルのレビュー：リクエストの中に隠れた10つ星プロダクトを見つけます。 |
+| `/plan-eng-review` | アーキテクチャ、データフロー、エッジケース、テストを固めます。 |
+| `/plan-design-review` | 各デザイン要素を0-10で評価し、10点が何かを説明します。 |
+| `/design-consultation` | ゼロからデザインシステムを構築します。 |
+| `/review` | マージ前のPRレビュー。CIは通るがプロダクションで壊れるバグを検出します。 |
+| `/debug` | 体系的な根本原因のデバッグ。調査なしの修正は行いません。 |
+| `/design-review` | デザイン監査＋アトミックコミットによる修正ループ。 |
+| `/qa` | 実際のブラウザを開き、バグを見つけ、修正し、再検証します。 |
+| `/qa-only` | /qaと同じですがレポートのみ — コード変更なし。 |
+| `/ship` | テスト実行、レビュー、プッシュ、PR作成。ワンコマンド。 |
+| `/document-release` | リリース内容に合わせてすべてのドキュメントを更新します。 |
+| `/retro` | メンバー別の内訳とシッピングストリークを含む週次振り返り。 |
+| `/browse` | ヘッドレスブラウザ — 実際のChromium、実際のクリック、コマンドあたり約100ms。 |
+| `/setup-browser-cookies` | 認証テスト用に実際のブラウザからCookieをインポートします。 |
+| `/careful` | 破壊的コマンド（rm -rf、DROP TABLE、force-push）の前に警告します。 |
+| `/freeze` | 編集を1つのディレクトリに制限します。警告ではなくハードブロック。 |
+| `/guard` | careful + freezeを同時に有効化します。 |
+| `/unfreeze` | ディレクトリの編集制限を解除します。 |
+| `/gstack-upgrade` | gstackを最新バージョンに更新します。 |
 
-## Build commands
+## ビルドコマンド
 
 ```bash
-bun install              # install dependencies
-bun test                 # run tests (free, <5s)
-bun run build            # generate docs + compile binaries
-bun run gen:skill-docs   # regenerate SKILL.md files from templates
-bun run skill:check      # health dashboard for all skills
+bun install              # 依存関係のインストール
+bun test                 # テスト実行（無料、5秒未満）
+bun run build            # ドキュメント生成＋バイナリコンパイル
+bun run gen:skill-docs   # テンプレートからSKILL.mdファイルを再生成
+bun run skill:check      # 全スキルのヘルスダッシュボード
 ```
 
-## Key conventions
+## 主要な規約
 
-- SKILL.md files are **generated** from `.tmpl` templates. Edit the template, not the output.
-- Run `bun run gen:skill-docs --host codex` to regenerate Codex-specific output.
-- The browse binary provides headless browser access. Use `$B <command>` in skills.
-- Safety skills (careful, freeze, guard) use inline advisory prose — always confirm before destructive operations.
+- SKILL.mdファイルは`.tmpl`テンプレートから**生成**されます。出力ではなくテンプレートを編集してください。
+- `bun run gen:skill-docs --host codex`でCodex固有の出力を再生成できます。
+- browseバイナリはヘッドレスブラウザアクセスを提供します。スキル内では`$B <command>`を使用してください。
+- 安全スキル（careful、freeze、guard）はインライン注意文を使用します — 破壊的操作の前に必ず確認してください。
