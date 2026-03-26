@@ -65,137 +65,141 @@ echo '{"skill":"investigate","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","repo":"'$(
 for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do [ -f "$_PF" ] && ~/.claude/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true; break; done
 ```
 
-If `PROACTIVE` is `"false"`, do not proactively suggest gstack skills — only invoke
-them when the user explicitly asks. The user opted out of proactive suggestions.
+## 言語（Language）
 
-If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.claude/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
+**すべてのユーザー向け応答・出力・質問を日本語で行うこと。**
+技術用語、コマンド名、コード、ファイルパス、エラーメッセージはそのまま英語を使用。
+AskUserQuestionの内容もすべて日本語で記述すること。
 
-If `LAKE_INTRO` is `no`: Before continuing, introduce the Completeness Principle.
-Tell the user: "gstack follows the **Boil the Lake** principle — always do the complete
-thing when AI makes the marginal cost near-zero. Read more: https://garryslist.org/posts/boil-the-ocean"
-Then offer to open the essay in their default browser:
+`PROACTIVE`が`"false"`の場合、gstackスキルを積極的に提案しないこと — ユーザーが明示的に求めた場合のみ呼び出す。ユーザーは積極的な提案をオプトアウトしている。
+
+出力に`UPGRADE_AVAILABLE <old> <new>`が表示された場合：`~/.claude/skills/gstack/gstack-upgrade/SKILL.md`を読み、「インラインアップグレードフロー」に従う（自動アップグレードが設定されていればそれを実行、そうでなければAskUserQuestionで4つの選択肢を提示、辞退された場合はスヌーズ状態を書き込む）。`JUST_UPGRADED <from> <to>`の場合：ユーザーに「gstack v{to}を実行中（アップデート完了！）」と伝えて続行。
+
+`LAKE_INTRO`が`no`の場合：先に完全性の原則を紹介してください。
+ユーザーに伝えること：「gstackは**湖を沸かせ（Boil the Lake）**の原則に従います — AIが限界コストをほぼゼロにする今、常に完全なものを作りましょう。詳しくはこちら：https://garryslist.org/posts/boil-the-ocean」
+ブラウザでエッセイを開くか提案してください：
 
 ```bash
 open https://garryslist.org/posts/boil-the-ocean
 touch ~/.gstack/.completeness-intro-seen
 ```
 
-Only run `open` if the user says yes. Always run `touch` to mark as seen. This only happens once.
+ユーザーが「はい」と言った場合のみ`open`を実行。`touch`は必ず実行して既読マークをつける。これは一度だけ行われる。
 
-If `TEL_PROMPTED` is `no` AND `LAKE_INTRO` is `yes`: After the lake intro is handled,
-ask the user about telemetry. Use AskUserQuestion:
+`TEL_PROMPTED`が`no`かつ`LAKE_INTRO`が`yes`の場合：湖の紹介が完了した後、
+テレメトリについてユーザーに尋ねる。AskUserQuestionを使用：
 
-> Help gstack get better! Community mode shares usage data (which skills you use, how long
-> they take, crash info) with a stable device ID so we can track trends and fix bugs faster.
-> No code, file paths, or repo names are ever sent.
-> Change anytime with `gstack-config set telemetry off`.
+> gstackの改善にご協力ください！コミュニティモードでは使用データ（使用スキル、所要時間、クラッシュ情報）を
+> 安定したデバイスIDと共に共有し、トレンドの追跡やバグ修正に役立てます。
+> コード、ファイルパス、リポジトリ名は一切送信されません。
+> `gstack-config set telemetry off`でいつでも変更可能です。
 
-Options:
-- A) Help gstack get better! (recommended)
-- B) No thanks
+選択肢：
+- A) gstackの改善に協力する（推奨）
+- B) いいえ、結構です
 
-If A: run `~/.claude/skills/gstack/bin/gstack-config set telemetry community`
+Aの場合：`~/.claude/skills/gstack/bin/gstack-config set telemetry community`を実行
 
-If B: ask a follow-up AskUserQuestion:
+Bの場合：フォローアップのAskUserQuestionを尋ねる：
 
-> How about anonymous mode? We just learn that *someone* used gstack — no unique ID,
-> no way to connect sessions. Just a counter that helps us know if anyone's out there.
+> 匿名モードはいかがですか？gstackが*誰かに*使われたことだけを記録します — 固有IDなし、
+> セッションの紐付けなし。誰かがいることを知るためのカウンターです。
 
-Options:
-- A) Sure, anonymous is fine
-- B) No thanks, fully off
+選択肢：
+- A) はい、匿名なら大丈夫です
+- B) いいえ、完全にオフにしてください
 
-If B→A: run `~/.claude/skills/gstack/bin/gstack-config set telemetry anonymous`
-If B→B: run `~/.claude/skills/gstack/bin/gstack-config set telemetry off`
+B→Aの場合：`~/.claude/skills/gstack/bin/gstack-config set telemetry anonymous`を実行
+B→Bの場合：`~/.claude/skills/gstack/bin/gstack-config set telemetry off`を実行
 
-Always run:
+必ず実行：
 ```bash
 touch ~/.gstack/.telemetry-prompted
 ```
 
-This only happens once. If `TEL_PROMPTED` is `yes`, skip this entirely.
+これは一度だけ行われる。`TEL_PROMPTED`が`yes`の場合、このステップは完全にスキップ。
 
-## AskUserQuestion Format
+## AskUserQuestion 形式
 
-**ALWAYS follow this structure for every AskUserQuestion call:**
-1. **Re-ground:** State the project, the current branch (use the `_BRANCH` value printed by the preamble — NOT any branch from conversation history or gitStatus), and the current plan/task. (1-2 sentences)
-2. **Simplify:** Explain the problem in plain English a smart 16-year-old could follow. No raw function names, no internal jargon, no implementation details. Use concrete examples and analogies. Say what it DOES, not what it's called.
-3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — always prefer the complete option over shortcuts (see Completeness Principle). Include `Completeness: X/10` for each option. Calibration: 10 = complete implementation (all edge cases, full coverage), 7 = covers happy path but skips some edges, 3 = shortcut that defers significant work. If both options are 8+, pick the higher; if one is ≤5, flag it.
-4. **Options:** Lettered options: `A) ... B) ... C) ...` — when an option involves effort, show both scales: `(human: ~X / CC: ~Y)`
-5. **One decision per question:** NEVER combine multiple independent decisions into a single AskUserQuestion. Each decision gets its own call with its own recommendation and focused options. Batching multiple AskUserQuestion calls in rapid succession is fine and often preferred. Only after all individual taste decisions are resolved should a final "Approve / Revise / Reject" gate be presented.
+**すべてのAskUserQuestion呼び出しで以下の構造に従うこと：**
+1. **状況確認:** プロジェクト、現在のブランチ（プリアンブルで出力された`_BRANCH`値を使用 — 会話履歴やgitStatusのブランチではない）、現在のプラン/タスクを述べる。（1-2文）
+2. **簡潔に:** 賢い16歳でも理解できる平易な日本語で問題を説明する。生の関数名、内部用語、実装詳細は使わない。具体例と例え話を使う。名前ではなく、何をするかを説明する。
+3. **推奨:** `推奨: [X]を選択。理由: [一行の理由]` — 常にショートカットよりも完全な選択肢を優先（完全性の原則を参照）。各選択肢に`完全性: X/10`を含める。基準：10 = 完全な実装（全エッジケース、全カバレッジ）、7 = ハッピーパスはカバーするが一部のエッジをスキップ、3 = 重要な作業を先送りするショートカット。両方の選択肢が8+の場合は高い方を選ぶ。一方が5以下の場合はフラグを立てる。
+4. **選択肢:** アルファベット選択肢：`A) ... B) ... C) ...` — 工数を伴う選択肢には両方のスケールを表示：`(人間: ~X / CC: ~Y)`
+5. **1つの質問に1つの決定:** 複数の独立した決定を1つのAskUserQuestionにまとめないこと。各決定にはそれぞれの呼び出しと推奨と集中した選択肢を用意する。複数のAskUserQuestionを連続で呼び出すのは問題なく、むしろ推奨される。全ての個別の好みの決定が解決された後にのみ、最終的な「承認 / 修正 / 却下」ゲートを提示する。
 
-Assume the user hasn't looked at this window in 20 minutes and doesn't have the code open. If you'd need to read the source to understand your own explanation, it's too complex.
+ユーザーは20分間このウィンドウを見ておらず、コードも開いていないと仮定すること。自分の説明を理解するためにソースを読む必要があるなら、複雑すぎる。
 
-Per-skill instructions may add additional formatting rules on top of this baseline.
+スキル固有の指示が、このベースラインの上に追加のフォーマットルールを加える場合がある。
 
-## Completeness Principle — Boil the Lake
+## 完全性の原則 — 湖を沸かせ（Boil the Lake）
 
-AI-assisted coding makes the marginal cost of completeness near-zero. When you present options:
+AIアシストコーディングは完全性の限界コストをほぼゼロにする。選択肢を提示する際：
 
-- If Option A is the complete implementation (full parity, all edge cases, 100% coverage) and Option B is a shortcut that saves modest effort — **always recommend A**. The delta between 80 lines and 150 lines is meaningless with CC+gstack. "Good enough" is the wrong instinct when "complete" costs minutes more.
-- **Lake vs. ocean:** A "lake" is boilable — 100% test coverage for a module, full feature implementation, handling all edge cases, complete error paths. An "ocean" is not — rewriting an entire system from scratch, adding features to dependencies you don't control, multi-quarter platform migrations. Recommend boiling lakes. Flag oceans as out of scope.
-- **When estimating effort**, always show both scales: human team time and CC+gstack time. The compression ratio varies by task type — use this reference:
+- 選択肢Aが完全な実装（完全な機能対等、全エッジケース、100%カバレッジ）で、選択肢Bがわずかな工数を節約するショートカットの場合 — **常にAを推奨**。80行と150行の差はCC+gstackでは意味がない。「完全」にあと数分しかかからないのに「十分良い」は間違った判断。
+- **湖 vs. 海：**「湖」は沸かせる — モジュールの100%テストカバレッジ、完全な機能実装、全エッジケースの処理、完全なエラーパス。「海」は沸かせない — システム全体のゼロからの書き直し、制御できない依存関係への機能追加、複数四半期にまたがるプラットフォーム移行。湖を沸かすことを推奨。海はスコープ外としてフラグを立てる。
+- **工数を見積もる際**、常に両方のスケールを表示：人間チームの時間とCC+gstackの時間。圧縮率はタスクの種類によって異なる — この参照を使用：
 
-| Task type | Human team | CC+gstack | Compression |
+| タスクの種類 | 人間チーム | CC+gstack | 圧縮率 |
 |-----------|-----------|-----------|-------------|
-| Boilerplate / scaffolding | 2 days | 15 min | ~100x |
-| Test writing | 1 day | 15 min | ~50x |
-| Feature implementation | 1 week | 30 min | ~30x |
-| Bug fix + regression test | 4 hours | 15 min | ~20x |
-| Architecture / design | 2 days | 4 hours | ~5x |
-| Research / exploration | 1 day | 3 hours | ~3x |
+| ボイラープレート / スキャフォールディング | 2日 | 15分 | ~100倍 |
+| テスト作成 | 1日 | 15分 | ~50倍 |
+| 機能実装 | 1週間 | 30分 | ~30倍 |
+| バグ修正 + リグレッションテスト | 4時間 | 15分 | ~20倍 |
+| アーキテクチャ / 設計 | 2日 | 4時間 | ~5倍 |
+| 調査 / 探索 | 1日 | 3時間 | ~3倍 |
 
-- This principle applies to test coverage, error handling, documentation, edge cases, and feature completeness. Don't skip the last 10% to "save time" — with AI, that 10% costs seconds.
+- この原則はテストカバレッジ、エラーハンドリング、ドキュメント、エッジケース、機能の完全性に適用される。最後の10%を「時間節約」のためにスキップしないこと — AIなら、その10%は数秒で済む。
 
-**Anti-patterns — DON'T do this:**
-- BAD: "Choose B — it covers 90% of the value with less code." (If A is only 70 lines more, choose A.)
-- BAD: "We can skip edge case handling to save time." (Edge case handling costs minutes with CC.)
-- BAD: "Let's defer test coverage to a follow-up PR." (Tests are the cheapest lake to boil.)
-- BAD: Quoting only human-team effort: "This would take 2 weeks." (Say: "2 weeks human / ~1 hour CC.")
+**アンチパターン — これをやってはいけない：**
+- 悪い例：「Bを選んでください — コード量が少なく90%の価値をカバーします。」（Aがたった70行多いだけなら、Aを選ぶ。）
+- 悪い例：「時間節約のためにエッジケース処理をスキップしましょう。」（CCならエッジケース処理は数分で済む。）
+- 悪い例：「テストカバレッジはフォローアップPRに先送りしましょう。」（テストは最も安く沸かせる湖。）
+- 悪い例：人間チームの工数だけを引用：「これは2週間かかります。」（「人間2週間 / CC ~1時間」と言う。）
 
-## Repo Ownership Mode — See Something, Say Something
+## リポジトリ所有モード — 気づいたら声を上げる
 
-`REPO_MODE` from the preamble tells you who owns issues in this repo:
+プリアンブルの`REPO_MODE`がこのリポジトリの問題の所有者を示す：
 
-- **`solo`** — One person does 80%+ of the work. They own everything. When you notice issues outside the current branch's changes (test failures, deprecation warnings, security advisories, linting errors, dead code, env problems), **investigate and offer to fix proactively**. The solo dev is the only person who will fix it. Default to action.
-- **`collaborative`** — Multiple active contributors. When you notice issues outside the branch's changes, **flag them via AskUserQuestion** — it may be someone else's responsibility. Default to asking, not fixing.
-- **`unknown`** — Treat as collaborative (safer default — ask before fixing).
+- **`solo`** — 1人が80%以上の作業を行う。全てを所有。現在のブランチの変更以外の問題（テスト失敗、非推奨警告、セキュリティアドバイザリ、lintエラー、デッドコード、環境問題）に気づいた場合、**積極的に調査して修正を提案する**。ソロ開発者が修正する唯一の人。アクションをデフォルトとする。
+- **`collaborative`** — 複数のアクティブなコントリビューター。ブランチの変更以外の問題に気づいた場合、**AskUserQuestionでフラグを立てる** — 他の人の責任かもしれない。質問をデフォルトとし、修正しない。
+- **`unknown`** — collaborativeとして扱う（より安全なデフォルト — 修正前に質問）。
 
-**See Something, Say Something:** Whenever you notice something that looks wrong during ANY workflow step — not just test failures — flag it briefly. One sentence: what you noticed and its impact. In solo mode, follow up with "Want me to fix it?" In collaborative mode, just flag it and move on.
+**見つけたら声を上げる：** 任意のワークフローステップ中に何かおかしいと気づいたら — テスト失敗だけでなく — 簡潔にフラグを立てる。1文で：何に気づいたかとその影響。soloモードでは「修正しましょうか？」とフォローアップ。collaborativeモードではフラグを立てるだけで先に進む。
 
-Never let a noticed issue silently pass. The whole point is proactive communication.
+気づいた問題を黙って見過ごさないこと。積極的なコミュニケーションがポイント。
 
-## Search Before Building
+## 作る前に探せ（Search Before Building）
 
-Before building infrastructure, unfamiliar patterns, or anything the runtime might have a built-in — **search first.** Read `~/.claude/skills/gstack/ETHOS.md` for the full philosophy.
+インフラ、馴染みのないパターン、ランタイムに組み込みがあるかもしれないものを構築する前に — **まず検索する。** 完全な哲学については`~/.claude/skills/gstack/ETHOS.md`を読むこと。
 
-**Three layers of knowledge:**
-- **Layer 1** (tried and true — in distribution). Don't reinvent the wheel. But the cost of checking is near-zero, and once in a while, questioning the tried-and-true is where brilliance occurs.
-- **Layer 2** (new and popular — search for these). But scrutinize: humans are subject to mania. Search results are inputs to your thinking, not answers.
-- **Layer 3** (first principles — prize these above all). Original observations derived from reasoning about the specific problem. The most valuable of all.
+**知識の3層：**
+- **レイヤー1**（実績あり — ディストリビューション内）。車輪の再発明をしない。ただし確認コストはほぼゼロで、たまに実績あるものに疑問を持つことこそが輝きを生む。
+- **レイヤー2**（新しくて人気 — これらを検索する）。ただし精査すること：人間は熱狂に左右される。検索結果は思考への入力であり、答えではない。
+- **レイヤー3**（第一原理 — これを最も重視する）。特定の問題について推論から導かれるオリジナルな観察。最も価値がある。
 
-**Eureka moment:** When first-principles reasoning reveals conventional wisdom is wrong, name it:
-"EUREKA: Everyone does X because [assumption]. But [evidence] shows this is wrong. Y is better because [reasoning]."
+**ユーレカの瞬間：** 第一原理の推論が常識の間違いを明らかにした場合、名前をつける：
+"EUREKA: みんなが[仮定]のためにXをしている。しかし[証拠]がこれは間違いだと示している。[推論]のためにYの方が良い。"
 
-Log eureka moments:
+ユーレカの瞬間を記録：
 ```bash
 jq -n --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg skill "SKILL_NAME" --arg branch "$(git branch --show-current 2>/dev/null)" --arg insight "ONE_LINE_SUMMARY" '{ts:$ts,skill:$skill,branch:$branch,insight:$insight}' >> ~/.gstack/analytics/eureka.jsonl 2>/dev/null || true
 ```
-Replace SKILL_NAME and ONE_LINE_SUMMARY. Runs inline — don't stop the workflow.
+SKILL_NAMEとONE_LINE_SUMMARYを置き換える。インラインで実行 — ワークフローを止めないこと。
 
-**WebSearch fallback:** If WebSearch is unavailable, skip the search step and note: "Search unavailable — proceeding with in-distribution knowledge only."
+**WebSearchフォールバック：** WebSearchが利用できない場合、検索ステップをスキップして以下を記載：「検索不可 — ディストリビューション内の知識のみで続行します。」
 
-## Contributor Mode
+## コントリビューターモード
 
-If `_CONTRIB` is `true`: you are in **contributor mode**. You're a gstack user who also helps make it better.
+`_CONTRIB`が`true`の場合：あなたは**コントリビューターモード**。gstackユーザーであると同時に、改善にも貢献する。
 
-**At the end of each major workflow step** (not after every single command), reflect on the gstack tooling you used. Rate your experience 0 to 10. If it wasn't a 10, think about why. If there is an obvious, actionable bug OR an insightful, interesting thing that could have been done better by gstack code or skill markdown — file a field report. Maybe our contributor will help make us better!
+**各主要ワークフローステップの終了時**（全コマンドの後ではない）、使用したgstackツールを振り返る。体験を0〜10で評価。10でなかった場合、理由を考える。明確で対処可能なバグ、またはgstackのコードやスキルMarkdownで改善できた洞察的で興味深い点があれば、フィールドレポートを提出する。コントリビューターが改善の手助けをするかもしれない！
 
-**Calibration — this is the bar:** For example, `$B js "await fetch(...)"` used to fail with `SyntaxError: await is only valid in async functions` because gstack didn't wrap expressions in async context. Small, but the input was reasonable and gstack should have handled it — that's the kind of thing worth filing. Things less consequential than this, ignore.
+**基準 — これがバー：** 例えば、`$B js "await fetch(...)"`が`SyntaxError: await is only valid in async functions`で失敗していたのは、gstackが式をasyncコンテキストでラップしていなかったため。小さいが、入力は妥当でgstackが処理すべきだった — これがレポートに値するもの。これより些細なことは無視。
 
-**NOT worth filing:** user's app bugs, network errors to user's URL, auth failures on user's site, user's own JS logic bugs.
+**レポート不要：** ユーザーのアプリのバグ、ユーザーのURLへのネットワークエラー、ユーザーのサイトの認証失敗、ユーザー自身のJSロジックバグ。
 
-**To file:** write `~/.gstack/contributor-logs/{slug}.md` with **all sections below** (do not truncate — include every section through the Date/Version footer):
+**レポート方法：** `~/.gstack/contributor-logs/{slug}.md`に**以下の全セクション**を書き込む（省略しないこと — Date/Versionフッターまで全セクションを含める）：
 
 ```
 # {Title}
@@ -220,46 +224,45 @@ Hey gstack team — ran into this while using /{skill-name}:
 **Date:** {YYYY-MM-DD} | **Version:** {gstack version} | **Skill:** /{skill}
 ```
 
-Slug: lowercase, hyphens, max 60 chars (e.g. `browse-js-no-await`). Skip if file already exists. Max 3 reports per session. File inline and continue — don't stop the workflow. Tell user: "Filed gstack field report: {title}"
+Slug: 小文字、ハイフン区切り、最大60文字（例：`browse-js-no-await`）。ファイルが既に存在する場合はスキップ。セッションあたり最大3レポート。インラインでファイルを作成して続行 — ワークフローを止めないこと。ユーザーに伝える：「gstackフィールドレポートを提出しました：{title}」
 
-## Completion Status Protocol
+## 完了ステータスプロトコル
 
-When completing a skill workflow, report status using one of:
-- **DONE** — All steps completed successfully. Evidence provided for each claim.
-- **DONE_WITH_CONCERNS** — Completed, but with issues the user should know about. List each concern.
-- **BLOCKED** — Cannot proceed. State what is blocking and what was tried.
-- **NEEDS_CONTEXT** — Missing information required to continue. State exactly what you need.
+スキルワークフロー完了時、以下のいずれかでステータスを報告：
+- **DONE** — すべてのステップが正常に完了。各主張にエビデンスを提供。
+- **DONE_WITH_CONCERNS** — 完了したが、ユーザーが知るべき問題あり。各懸念を列挙。
+- **BLOCKED** — 続行不可。ブロッカーと試行した内容を記述。
+- **NEEDS_CONTEXT** — 続行に必要な情報が不足。必要な情報を正確に記述。
 
-### Escalation
+### エスカレーション
 
-It is always OK to stop and say "this is too hard for me" or "I'm not confident in this result."
+「これは自分には難しすぎる」「この結果に自信がない」と言って止めることは常にOK。
 
-Bad work is worse than no work. You will not be penalized for escalating.
-- If you have attempted a task 3 times without success, STOP and escalate.
-- If you are uncertain about a security-sensitive change, STOP and escalate.
-- If the scope of work exceeds what you can verify, STOP and escalate.
+質の悪い仕事は何もしないよりも悪い。エスカレーションでペナルティを受けることはない。
+- タスクを3回試みて成功しなかった場合、停止してエスカレーション。
+- セキュリティに関わる変更に確信が持てない場合、停止してエスカレーション。
+- 作業範囲が検証可能な範囲を超える場合、停止してエスカレーション。
 
-Escalation format:
+エスカレーション形式：
 ```
 STATUS: BLOCKED | NEEDS_CONTEXT
-REASON: [1-2 sentences]
-ATTEMPTED: [what you tried]
-RECOMMENDATION: [what the user should do next]
+REASON: [1-2文]
+ATTEMPTED: [試行した内容]
+RECOMMENDATION: [ユーザーが次にすべきこと]
 ```
 
-## Telemetry (run last)
+## テレメトリ（最後に実行）
 
-After the skill workflow completes (success, error, or abort), log the telemetry event.
-Determine the skill name from the `name:` field in this file's YAML frontmatter.
-Determine the outcome from the workflow result (success if completed normally, error
-if it failed, abort if the user interrupted).
+スキルワークフロー完了後（成功、エラー、中断のいずれか）、テレメトリイベントをログに記録する。
+このファイルのYAMLフロントマターの`name:`フィールドからスキル名を決定する。
+ワークフローの結果からアウトカムを決定する（正常完了ならsuccess、失敗ならerror、
+ユーザーが中断したならabort）。
 
-**PLAN MODE EXCEPTION — ALWAYS RUN:** This command writes telemetry to
-`~/.gstack/analytics/` (user config directory, not project files). The skill
-preamble already writes to the same directory — this is the same pattern.
-Skipping this command loses session duration and outcome data.
+**プランモード例外 — 必ず実行：** このコマンドは`~/.gstack/analytics/`（ユーザー設定ディレクトリ、プロジェクトファイルではない）にテレメトリを書き込む。スキル
+プリアンブルは既に同じディレクトリに書き込んでいる — 同じパターン。
+このコマンドをスキップするとセッション期間とアウトカムデータが失われる。
 
-Run this bash:
+以下のbashを実行：
 
 ```bash
 _TEL_END=$(date +%s)
@@ -270,29 +273,27 @@ rm -f ~/.gstack/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
   --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
 ```
 
-Replace `SKILL_NAME` with the actual skill name from frontmatter, `OUTCOME` with
-success/error/abort, and `USED_BROWSE` with true/false based on whether `$B` was used.
-If you cannot determine the outcome, use "unknown". This runs in the background and
-never blocks the user.
+`SKILL_NAME`をフロントマターの実際のスキル名に、`OUTCOME`をsuccess/error/abortに、
+`USED_BROWSE`を`$B`が使用されたかどうかに基づいてtrue/falseに置き換える。
+アウトカムを判断できない場合は"unknown"を使用。これはバックグラウンドで実行され、
+ユーザーをブロックしない。
 
-## Plan Status Footer
+## プランステータスフッター
 
-When you are in plan mode and about to call ExitPlanMode:
+プランモードでExitPlanModeを呼び出す直前に：
 
-1. Check if the plan file already has a `## GSTACK REVIEW REPORT` section.
-2. If it DOES — skip (a review skill already wrote a richer report).
-3. If it does NOT — run this command:
+1. プランファイルに既に`## GSTACK REVIEW REPORT`セクションがあるか確認。
+2. ある場合 — スキップ（レビュースキルがより詳細なレポートを既に書いている）。
+3. ない場合 — このコマンドを実行：
 
 \`\`\`bash
 ~/.claude/skills/gstack/bin/gstack-review-read
 \`\`\`
 
-Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
+その後、プランファイルの末尾に`## GSTACK REVIEW REPORT`セクションを書き込む：
 
-- If the output contains review entries (JSONL lines before `---CONFIG---`): format the
-  standard report table with runs/status/findings per skill, same format as the review
-  skills use.
-- If the output is `NO_REVIEWS` or empty: write this placeholder table:
+- 出力にレビューエントリ（`---CONFIG---`の前のJSONL行）が含まれる場合：レビュースキルが使用するのと同じ形式で、スキルごとの実行数/ステータス/所見を含む標準レポートテーブルをフォーマットする。
+- 出力が`NO_REVIEWS`または空の場合：このプレースホルダーテーブルを書き込む：
 
 \`\`\`markdown
 ## GSTACK REVIEW REPORT
@@ -307,49 +308,47 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 **VERDICT:** NO REVIEWS YET — run \`/autoplan\` for full review pipeline, or individual reviews above.
 \`\`\`
 
-**PLAN MODE EXCEPTION — ALWAYS RUN:** This writes to the plan file, which is the one
-file you are allowed to edit in plan mode. The plan file review report is part of the
-plan's living status.
+**プランモード例外 — 必ず実行：** これはプランファイルに書き込む。プランモードで編集が許可されている唯一のファイル。プランファイルのレビューレポートはプランの生きたステータスの一部。
 
-# Systematic Debugging
+# 体系的デバッグ
 
-## Iron Law
+## 鉄の掟
 
-**NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST.**
+**根本原因の調査なしに修正してはならない。**
 
-Fixing symptoms creates whack-a-mole debugging. Every fix that doesn't address root cause makes the next bug harder to find. Find the root cause, then fix it.
+症状の修正はモグラ叩きデバッグを生む。根本原因に対処しない修正は、次のバグの発見をより困難にする。根本原因を見つけてから修正する。
 
 ---
 
-## Phase 1: Root Cause Investigation
+## フェーズ1：根本原因調査
 
-Gather context before forming any hypothesis.
+仮説を立てる前にコンテキストを収集する。
 
-1. **Collect symptoms:** Read the error messages, stack traces, and reproduction steps. If the user hasn't provided enough context, ask ONE question at a time via AskUserQuestion.
+1. **症状の収集：** エラーメッセージ、スタックトレース、再現手順を読む。ユーザーが十分なコンテキストを提供していない場合、AskUserQuestionで一度に1つの質問をする。
 
-2. **Read the code:** Trace the code path from the symptom back to potential causes. Use Grep to find all references, Read to understand the logic.
+2. **コードを読む：** 症状からコードパスを潜在的な原因まで遡って追跡する。Grepで全ての参照を見つけ、Readでロジックを理解する。
 
-3. **Check recent changes:**
+3. **最近の変更を確認：**
    ```bash
    git log --oneline -20 -- <affected-files>
    ```
-   Was this working before? What changed? A regression means the root cause is in the diff.
+   以前は動いていたか？何が変わったか？リグレッションなら根本原因はdiffの中にある。
 
-4. **Reproduce:** Can you trigger the bug deterministically? If not, gather more evidence before proceeding.
+4. **再現：** バグを確定的にトリガーできるか？できない場合、続行前にさらに証拠を集める。
 
-Output: **"Root cause hypothesis: ..."** — a specific, testable claim about what is wrong and why.
+出力：**「根本原因仮説：...」** — 何が問題でなぜそうなっているかについての具体的でテスト可能な主張。
 
 ---
 
-## Scope Lock
+## スコープロック
 
-After forming your root cause hypothesis, lock edits to the affected module to prevent scope creep.
+根本原因仮説を立てた後、スコープクリープを防ぐために影響を受けるモジュールへの編集をロックする。
 
 ```bash
 [ -x "${CLAUDE_SKILL_DIR}/../freeze/bin/check-freeze.sh" ] && echo "FREEZE_AVAILABLE" || echo "FREEZE_UNAVAILABLE"
 ```
 
-**If FREEZE_AVAILABLE:** Identify the narrowest directory containing the affected files. Write it to the freeze state file:
+**FREEZE_AVAILABLEの場合：** 影響を受けるファイルを含む最も狭いディレクトリを特定する。フリーズ状態ファイルに書き込む：
 
 ```bash
 STATE_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.gstack}"
@@ -358,117 +357,117 @@ echo "<detected-directory>/" > "$STATE_DIR/freeze-dir.txt"
 echo "Debug scope locked to: <detected-directory>/"
 ```
 
-Substitute `<detected-directory>` with the actual directory path (e.g., `src/auth/`). Tell the user: "Edits restricted to `<dir>/` for this debug session. This prevents changes to unrelated code. Run `/unfreeze` to remove the restriction."
+`<detected-directory>`を実際のディレクトリパスに置き換える（例：`src/auth/`）。ユーザーに伝える：「このデバッグセッションでは`<dir>/`への編集に制限されています。無関係なコードへの変更を防ぎます。制限を解除するには`/unfreeze`を実行してください。」
 
-If the bug spans the entire repo or the scope is genuinely unclear, skip the lock and note why.
+バグがリポジトリ全体にまたがるか、スコープが本当に不明確な場合はロックをスキップし、理由を記載する。
 
-**If FREEZE_UNAVAILABLE:** Skip scope lock. Edits are unrestricted.
+**FREEZE_UNAVAILABLEの場合：** スコープロックをスキップ。編集は無制限。
 
 ---
 
-## Phase 2: Pattern Analysis
+## フェーズ2：パターン分析
 
-Check if this bug matches a known pattern:
+このバグが既知のパターンに一致するか確認：
 
-| Pattern | Signature | Where to look |
+| パターン | シグネチャ | 確認場所 |
 |---------|-----------|---------------|
-| Race condition | Intermittent, timing-dependent | Concurrent access to shared state |
-| Nil/null propagation | NoMethodError, TypeError | Missing guards on optional values |
-| State corruption | Inconsistent data, partial updates | Transactions, callbacks, hooks |
-| Integration failure | Timeout, unexpected response | External API calls, service boundaries |
-| Configuration drift | Works locally, fails in staging/prod | Env vars, feature flags, DB state |
-| Stale cache | Shows old data, fixes on cache clear | Redis, CDN, browser cache, Turbo |
+| 競合状態 | 間欠的、タイミング依存 | 共有状態への同時アクセス |
+| Nil/null伝播 | NoMethodError、TypeError | オプション値に対する欠落したガード |
+| 状態破損 | 一貫性のないデータ、部分的な更新 | トランザクション、コールバック、フック |
+| 統合失敗 | タイムアウト、予期しないレスポンス | 外部API呼び出し、サービス境界 |
+| 設定のドリフト | ローカルで動作、ステージング/本番で失敗 | 環境変数、フィーチャーフラグ、DBの状態 |
+| 古いキャッシュ | 古いデータを表示、キャッシュクリアで修正 | Redis、CDN、ブラウザキャッシュ、Turbo |
 
-Also check:
-- `TODOS.md` for related known issues
-- `git log` for prior fixes in the same area — **recurring bugs in the same files are an architectural smell**, not a coincidence
+併せて確認：
+- `TODOS.md`で関連する既知の問題
+- `git log`で同じ領域の過去の修正 — **同じファイルで繰り返し発生するバグはアーキテクチャの臭い**であり、偶然ではない
 
-**External pattern search:** If the bug doesn't match a known pattern above, WebSearch for:
-- "{framework} {generic error type}" — **sanitize first:** strip hostnames, IPs, file paths, SQL, customer data. Search the error category, not the raw message.
+**外部パターン検索：** バグが上記の既知パターンに一致しない場合、WebSearchで検索：
+- "{framework} {一般的なエラータイプ}" — **まずサニタイズ：** ホスト名、IP、ファイルパス、SQL、顧客データを除去する。生のメッセージではなく、エラーカテゴリで検索する。
 - "{library} {component} known issues"
 
-If WebSearch is unavailable, skip this search and proceed with hypothesis testing. If a documented solution or known dependency bug surfaces, present it as a candidate hypothesis in Phase 3.
+WebSearchが利用できない場合、この検索をスキップして仮説テストに進む。文書化された解決策や既知の依存関係バグが見つかった場合、フェーズ3で候補仮説として提示する。
 
 ---
 
-## Phase 3: Hypothesis Testing
+## フェーズ3：仮説テスト
 
-Before writing ANY fix, verify your hypothesis.
+修正を書く前に、仮説を検証する。
 
-1. **Confirm the hypothesis:** Add a temporary log statement, assertion, or debug output at the suspected root cause. Run the reproduction. Does the evidence match?
+1. **仮説の確認：** 疑わしい根本原因に一時的なログ文、アサーション、デバッグ出力を追加する。再現を実行する。証拠は一致するか？
 
-2. **If the hypothesis is wrong:** Before forming the next hypothesis, consider searching for the error. **Sanitize first** — strip hostnames, IPs, file paths, SQL fragments, customer identifiers, and any internal/proprietary data from the error message. Search only the generic error type and framework context: "{component} {sanitized error type} {framework version}". If the error message is too specific to sanitize safely, skip the search. If WebSearch is unavailable, skip and proceed. Then return to Phase 1. Gather more evidence. Do not guess.
+2. **仮説が間違っている場合：** 次の仮説を立てる前に、エラーの検索を検討する。**まずサニタイズ** — ホスト名、IP、ファイルパス、SQLフラグメント、顧客識別子、内部/独自データをエラーメッセージから除去する。一般的なエラータイプとフレームワークのコンテキストのみで検索："{component} {サニタイズされたエラータイプ} {framework version}"。エラーメッセージが安全にサニタイズできないほど特殊な場合は、検索をスキップ。WebSearchが利用できない場合はスキップして続行。その後フェーズ1に戻る。さらに証拠を集める。推測しないこと。
 
-3. **3-strike rule:** If 3 hypotheses fail, **STOP**. Use AskUserQuestion:
+3. **3ストライクルール：** 3つの仮説が失敗した場合、**停止**。AskUserQuestionを使用：
    ```
-   3 hypotheses tested, none match. This may be an architectural issue
-   rather than a simple bug.
+   3つの仮説をテストしましたが、いずれも一致しません。これは単純なバグではなく、
+   アーキテクチャの問題かもしれません。
 
-   A) Continue investigating — I have a new hypothesis: [describe]
-   B) Escalate for human review — this needs someone who knows the system
-   C) Add logging and wait — instrument the area and catch it next time
+   A) 調査を続ける — 新しい仮説があります：[説明]
+   B) 人間のレビューにエスカレーション — システムを知っている人が必要
+   C) ログを追加して待つ — この領域を計装して次回キャッチする
    ```
 
-**Red flags** — if you see any of these, slow down:
-- "Quick fix for now" — there is no "for now." Fix it right or escalate.
-- Proposing a fix before tracing data flow — you're guessing.
-- Each fix reveals a new problem elsewhere — wrong layer, not wrong code.
+**レッドフラグ** — 以下のいずれかを見たら、スローダウン：
+- 「とりあえずの応急処置」 — 「とりあえず」は存在しない。正しく修正するかエスカレーションする。
+- データフローを追跡する前に修正を提案 — 推測している。
+- 各修正が別の場所で新しい問題を明らかにする — 間違っているのはレイヤーであり、コードではない。
 
 ---
 
-## Phase 4: Implementation
+## フェーズ4：実装
 
-Once root cause is confirmed:
+根本原因が確認されたら：
 
-1. **Fix the root cause, not the symptom.** The smallest change that eliminates the actual problem.
+1. **症状ではなく根本原因を修正する。** 実際の問題を解消する最小の変更。
 
-2. **Minimal diff:** Fewest files touched, fewest lines changed. Resist the urge to refactor adjacent code.
+2. **最小のdiff：** 変更するファイル数、変更する行数を最小に。隣接するコードのリファクタリングをしたい衝動に抵抗する。
 
-3. **Write a regression test** that:
-   - **Fails** without the fix (proves the test is meaningful)
-   - **Passes** with the fix (proves the fix works)
+3. **リグレッションテストを書く：**
+   - 修正なしで**失敗する**（テストが意味があることを証明）
+   - 修正ありで**合格する**（修正が機能することを証明）
 
-4. **Run the full test suite.** Paste the output. No regressions allowed.
+4. **フルテストスイートを実行する。** 出力を貼り付ける。リグレッションは許されない。
 
-5. **If the fix touches >5 files:** Use AskUserQuestion to flag the blast radius:
+5. **修正が5ファイル以上に及ぶ場合：** AskUserQuestionで影響範囲をフラグ立て：
    ```
-   This fix touches N files. That's a large blast radius for a bug fix.
-   A) Proceed — the root cause genuinely spans these files
-   B) Split — fix the critical path now, defer the rest
-   C) Rethink — maybe there's a more targeted approach
+   この修正はNファイルに及びます。バグ修正としては大きな影響範囲です。
+   A) 続行 — 根本原因は本当にこれらのファイルにまたがっている
+   B) 分割 — クリティカルパスを今修正し、残りは後で
+   C) 再考 — もっとターゲットを絞ったアプローチがあるかもしれない
    ```
 
 ---
 
-## Phase 5: Verification & Report
+## フェーズ5：検証とレポート
 
-**Fresh verification:** Reproduce the original bug scenario and confirm it's fixed. This is not optional.
+**新鮮な検証：** 元のバグシナリオを再現し、修正されたことを確認する。これは省略不可。
 
-Run the test suite and paste the output.
+テストスイートを実行して出力を貼り付ける。
 
-Output a structured debug report:
+構造化されたデバッグレポートを出力：
 ```
-DEBUG REPORT
+デバッグレポート
 ════════════════════════════════════════
-Symptom:         [what the user observed]
-Root cause:      [what was actually wrong]
-Fix:             [what was changed, with file:line references]
-Evidence:        [test output, reproduction attempt showing fix works]
-Regression test: [file:line of the new test]
-Related:         [TODOS.md items, prior bugs in same area, architectural notes]
-Status:          DONE | DONE_WITH_CONCERNS | BLOCKED
+症状:           [ユーザーが観察したこと]
+根本原因:       [実際に何が間違っていたか]
+修正:           [何を変更したか、file:line参照付き]
+証拠:           [テスト出力、修正が機能することを示す再現試行]
+リグレッションテスト: [新しいテストのfile:line]
+関連:           [TODOS.md項目、同じ領域の過去のバグ、アーキテクチャの注記]
+ステータス:     DONE | DONE_WITH_CONCERNS | BLOCKED
 ════════════════════════════════════════
 ```
 
 ---
 
-## Important Rules
+## 重要なルール
 
-- **3+ failed fix attempts → STOP and question the architecture.** Wrong architecture, not failed hypothesis.
-- **Never apply a fix you cannot verify.** If you can't reproduce and confirm, don't ship it.
-- **Never say "this should fix it."** Verify and prove it. Run the tests.
-- **If fix touches >5 files → AskUserQuestion** about blast radius before proceeding.
-- **Completion status:**
-  - DONE — root cause found, fix applied, regression test written, all tests pass
-  - DONE_WITH_CONCERNS — fixed but cannot fully verify (e.g., intermittent bug, requires staging)
-  - BLOCKED — root cause unclear after investigation, escalated
+- **3回以上の修正失敗 → 停止してアーキテクチャを疑う。** 間違っているのはアーキテクチャであり、失敗した仮説ではない。
+- **検証できない修正を適用しない。** 再現して確認できないなら、出荷しない。
+- **「これで修正されるはず」とは絶対に言わない。** 検証して証明する。テストを実行する。
+- **修正が5ファイル以上に及ぶ場合 → AskUserQuestion**で影響範囲について続行前に確認。
+- **完了ステータス：**
+  - DONE — 根本原因発見、修正適用、リグレッションテスト作成、全テスト合格
+  - DONE_WITH_CONCERNS — 修正したが完全に検証できない（例：間欠的なバグ、ステージングが必要）
+  - BLOCKED — 調査後も根本原因が不明確、エスカレーション済み

@@ -48,78 +48,81 @@ echo '{"skill":"land-and-deploy","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","repo":
 for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do [ -f "$_PF" ] && ~/.claude/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true; break; done
 ```
 
-If `PROACTIVE` is `"false"`, do not proactively suggest gstack skills — only invoke
-them when the user explicitly asks. The user opted out of proactive suggestions.
+## 言語（Language）
 
-If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.claude/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
+**すべてのユーザー向け応答・出力・質問を日本語で行うこと。**
+技術用語、コマンド名、コード、ファイルパス、エラーメッセージはそのまま英語を使用。
+AskUserQuestionの内容もすべて日本語で記述すること。
 
-If `LAKE_INTRO` is `no`: Before continuing, introduce the Completeness Principle.
-Tell the user: "gstack follows the **Boil the Lake** principle — always do the complete
-thing when AI makes the marginal cost near-zero. Read more: https://garryslist.org/posts/boil-the-ocean"
-Then offer to open the essay in their default browser:
+`PROACTIVE`が`"false"`の場合、gstackスキルを積極的に提案しないこと — ユーザーが明示的に要求した場合のみ呼び出す。ユーザーは積極的な提案をオプトアウトしている。
+
+出力に`UPGRADE_AVAILABLE <old> <new>`が表示された場合：`~/.claude/skills/gstack/gstack-upgrade/SKILL.md`を読み、「インラインアップグレードフロー」に従う（自動アップグレードが設定されている場合は自動実行、そうでなければAskUserQuestionで4つの選択肢を提示し、辞退された場合はスヌーズ状態を書き込む）。`JUST_UPGRADED <from> <to>`の場合：ユーザーに「gstack v{to}で実行中（アップデート完了！）」と伝えて続行。
+
+`LAKE_INTRO`が`no`の場合：先に完全性の原則を紹介してください。
+ユーザーに伝えること：「gstackは**湖を沸かせ（Boil the Lake）**の原則に従います — AIが限界コストをほぼゼロにする今、常に完全なものを作りましょう。詳しくはこちら：https://garryslist.org/posts/boil-the-ocean」
+ブラウザでエッセイを開くか提案してください：
 
 ```bash
 open https://garryslist.org/posts/boil-the-ocean
 touch ~/.gstack/.completeness-intro-seen
 ```
 
-Only run `open` if the user says yes. Always run `touch` to mark as seen. This only happens once.
+ユーザーが「はい」と言った場合のみ`open`を実行。`touch`は常に実行してマーク済みにする。これは一度だけ行われる。
 
-If `TEL_PROMPTED` is `no` AND `LAKE_INTRO` is `yes`: After the lake intro is handled,
-ask the user about telemetry. Use AskUserQuestion:
+`TEL_PROMPTED`が`no`かつ`LAKE_INTRO`が`yes`の場合：湖のイントロが処理された後、テレメトリについてユーザーに確認する。AskUserQuestionを使用：
 
-> Help gstack get better! Community mode shares usage data (which skills you use, how long
-> they take, crash info) with a stable device ID so we can track trends and fix bugs faster.
-> No code, file paths, or repo names are ever sent.
-> Change anytime with `gstack-config set telemetry off`.
-
-Options:
-- A) Help gstack get better! (recommended)
-- B) No thanks
-
-If A: run `~/.claude/skills/gstack/bin/gstack-config set telemetry community`
-
-If B: ask a follow-up AskUserQuestion:
-
-> How about anonymous mode? We just learn that *someone* used gstack — no unique ID,
-> no way to connect sessions. Just a counter that helps us know if anyone's out there.
+> gstackの改善にご協力ください！コミュニティモードでは使用データ（使用スキル、所要時間、クラッシュ情報）を
+> 安定したデバイスIDと共に共有し、トレンドの追跡やバグ修正に役立てます。
+> コード、ファイルパス、リポジトリ名は一切送信されません。
+> `gstack-config set telemetry off`でいつでも変更可能です。
 
 Options:
-- A) Sure, anonymous is fine
-- B) No thanks, fully off
+- A) gstackの改善に協力する（推奨）
+- B) いいえ、結構です
 
-If B→A: run `~/.claude/skills/gstack/bin/gstack-config set telemetry anonymous`
-If B→B: run `~/.claude/skills/gstack/bin/gstack-config set telemetry off`
+Aの場合：`~/.claude/skills/gstack/bin/gstack-config set telemetry community`を実行
 
-Always run:
+Bの場合：フォローアップのAskUserQuestionを表示：
+
+> 匿名モードはいかがですか？gstackが*誰かに*使われたことだけを記録します — 固有IDなし、
+> セッションの紐付けなし。誰かがいることを知るためのカウンターです。
+
+Options:
+- A) はい、匿名なら大丈夫です
+- B) いいえ、完全にオフにしてください
+
+B→Aの場合：`~/.claude/skills/gstack/bin/gstack-config set telemetry anonymous`を実行
+B→Bの場合：`~/.claude/skills/gstack/bin/gstack-config set telemetry off`を実行
+
+常に実行：
 ```bash
 touch ~/.gstack/.telemetry-prompted
 ```
 
-This only happens once. If `TEL_PROMPTED` is `yes`, skip this entirely.
+これは一度だけ行われる。`TEL_PROMPTED`が`yes`の場合、これを完全にスキップする。
 
-## AskUserQuestion Format
+## AskUserQuestion 形式
 
-**ALWAYS follow this structure for every AskUserQuestion call:**
-1. **Re-ground:** State the project, the current branch (use the `_BRANCH` value printed by the preamble — NOT any branch from conversation history or gitStatus), and the current plan/task. (1-2 sentences)
-2. **Simplify:** Explain the problem in plain English a smart 16-year-old could follow. No raw function names, no internal jargon, no implementation details. Use concrete examples and analogies. Say what it DOES, not what it's called.
-3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — always prefer the complete option over shortcuts (see Completeness Principle). Include `Completeness: X/10` for each option. Calibration: 10 = complete implementation (all edge cases, full coverage), 7 = covers happy path but skips some edges, 3 = shortcut that defers significant work. If both options are 8+, pick the higher; if one is ≤5, flag it.
-4. **Options:** Lettered options: `A) ... B) ... C) ...` — when an option involves effort, show both scales: `(human: ~X / CC: ~Y)`
-5. **One decision per question:** NEVER combine multiple independent decisions into a single AskUserQuestion. Each decision gets its own call with its own recommendation and focused options. Batching multiple AskUserQuestion calls in rapid succession is fine and often preferred. Only after all individual taste decisions are resolved should a final "Approve / Revise / Reject" gate be presented.
+**すべてのAskUserQuestion呼び出しで以下の構造に従うこと：**
+1. **状況確認:** プロジェクト、現在のブランチ（プリアンブルで出力された`_BRANCH`値を使用 — 会話履歴やgitStatusのブランチではない）、現在のプラン/タスクを述べる。（1-2文）
+2. **簡潔に:** 賢い16歳でも理解できる平易な日本語で問題を説明する。生の関数名、内部用語、実装詳細は使わない。具体例と例え話を使う。名前ではなく、何をするかを説明する。
+3. **推奨:** `推奨: [X]を選択。理由: [一行の理由]` — 常にショートカットより完全な選択肢を優先する（完全性の原則を参照）。各選択肢に`Completeness: X/10`を含める。基準：10 = 完全な実装（全エッジケース、完全なカバレッジ）、7 = ハッピーパスはカバーするが一部のエッジを省略、3 = 重要な作業を先送りするショートカット。両方の選択肢が8+の場合、高い方を選択。一方が5以下の場合、フラグを立てる。
+4. **Options:** レター付き選択肢：`A) ... B) ... C) ...` — 選択肢に作業が伴う場合、両方のスケールを表示：`(human: ~X / CC: ~Y)`
+5. **1つの質問に1つの決定：** 複数の独立した決定を1つのAskUserQuestionにまとめてはならない。各決定にはそれぞれのAskUserQuestion呼び出しと推奨と焦点を絞った選択肢を設ける。複数のAskUserQuestion呼び出しを連続して行うのは問題ない。すべての個別の判断が解決された後にのみ、最終的な「承認 / 修正 / 却下」ゲートを提示する。
 
-Assume the user hasn't looked at this window in 20 minutes and doesn't have the code open. If you'd need to read the source to understand your own explanation, it's too complex.
+ユーザーは20分間このウィンドウを見ておらず、コードも開いていないと仮定すること。自分の説明を理解するためにソースを読む必要があるなら、複雑すぎる。
 
-Per-skill instructions may add additional formatting rules on top of this baseline.
+スキルごとの指示が、このベースラインに追加のフォーマットルールを加える場合がある。
 
-## Completeness Principle — Boil the Lake
+## 完全性の原則 — 湖を沸かせ（Boil the Lake）
 
-AI-assisted coding makes the marginal cost of completeness near-zero. When you present options:
+AIアシストコーディングは完全性の限界コストをほぼゼロにする。選択肢を提示する際：
 
-- If Option A is the complete implementation (full parity, all edge cases, 100% coverage) and Option B is a shortcut that saves modest effort — **always recommend A**. The delta between 80 lines and 150 lines is meaningless with CC+gstack. "Good enough" is the wrong instinct when "complete" costs minutes more.
-- **Lake vs. ocean:** A "lake" is boilable — 100% test coverage for a module, full feature implementation, handling all edge cases, complete error paths. An "ocean" is not — rewriting an entire system from scratch, adding features to dependencies you don't control, multi-quarter platform migrations. Recommend boiling lakes. Flag oceans as out of scope.
-- **When estimating effort**, always show both scales: human team time and CC+gstack time. The compression ratio varies by task type — use this reference:
+- 選択肢Aが完全な実装（完全な互換性、全エッジケース、100%カバレッジ）で、選択肢Bがわずかな労力を節約するショートカットの場合 — **常にAを推奨する**。CC+gstackでは80行と150行の差は無意味。「完全」が数分余分にかかるだけなら「十分」は誤った判断。
+- **湖 vs. 海：**「湖」は沸かせる — モジュールの100%テストカバレッジ、完全な機能実装、全エッジケースの処理、完全なエラーパス。「海」は沸かせない — システム全体のスクラッチからの書き直し、自分が管理しない依存関係への機能追加、複数四半期にわたるプラットフォーム移行。湖を沸かすことを推奨する。海はスコープ外としてフラグを立てる。
+- **工数を見積もる際**、常に両方のスケールを表示する：人間チームの時間とCC+gstackの時間。圧縮率はタスクの種類によって異なる — 以下を参考にする：
 
-| Task type | Human team | CC+gstack | Compression |
+| タスクの種類 | Human team | CC+gstack | Compression |
 |-----------|-----------|-----------|-------------|
 | Boilerplate / scaffolding | 2 days | 15 min | ~100x |
 | Test writing | 1 day | 15 min | ~50x |
@@ -128,57 +131,57 @@ AI-assisted coding makes the marginal cost of completeness near-zero. When you p
 | Architecture / design | 2 days | 4 hours | ~5x |
 | Research / exploration | 1 day | 3 hours | ~3x |
 
-- This principle applies to test coverage, error handling, documentation, edge cases, and feature completeness. Don't skip the last 10% to "save time" — with AI, that 10% costs seconds.
+- この原則はテストカバレッジ、エラーハンドリング、ドキュメント、エッジケース、機能の完全性に適用される。AIを使えば残り10%は数秒のコスト — 「時間節約のため」に最後の10%をスキップしない。
 
-**Anti-patterns — DON'T do this:**
-- BAD: "Choose B — it covers 90% of the value with less code." (If A is only 70 lines more, choose A.)
-- BAD: "We can skip edge case handling to save time." (Edge case handling costs minutes with CC.)
-- BAD: "Let's defer test coverage to a follow-up PR." (Tests are the cheapest lake to boil.)
-- BAD: Quoting only human-team effort: "This would take 2 weeks." (Say: "2 weeks human / ~1 hour CC.")
+**アンチパターン — これをやってはいけない：**
+- 悪い例：「Bを選択 — 少ないコードで90%の価値をカバー。」（Aがわずか70行多いだけなら、Aを選択。）
+- 悪い例：「時間節約のためエッジケース処理を省略。」（CCではエッジケース処理は数分のコスト。）
+- 悪い例：「テストカバレッジはフォローアップPRに先送り。」（テストは最も安く沸かせる湖。）
+- 悪い例：人間チームの工数のみを引用：「これは2週間かかります。」（「2 weeks human / ~1 hour CC」と言う。）
 
-## Repo Ownership Mode — See Something, Say Something
+## リポジトリ所有モード — 気づいたら声を上げる
 
-`REPO_MODE` from the preamble tells you who owns issues in this repo:
+プリアンブルの`REPO_MODE`はこのリポジトリの課題を誰が所有しているかを示す：
 
-- **`solo`** — One person does 80%+ of the work. They own everything. When you notice issues outside the current branch's changes (test failures, deprecation warnings, security advisories, linting errors, dead code, env problems), **investigate and offer to fix proactively**. The solo dev is the only person who will fix it. Default to action.
-- **`collaborative`** — Multiple active contributors. When you notice issues outside the branch's changes, **flag them via AskUserQuestion** — it may be someone else's responsibility. Default to asking, not fixing.
-- **`unknown`** — Treat as collaborative (safer default — ask before fixing).
+- **`solo`** — 1人が80%以上の作業を行う。すべてを所有。現在のブランチの変更以外の問題（テスト失敗、非推奨警告、セキュリティ勧告、lintエラー、デッドコード、環境問題）に気づいた場合、**積極的に調査して修正を提案する**。soloの開発者がそれを修正する唯一の人物。アクションをデフォルトにする。
+- **`collaborative`** — 複数のアクティブなコントリビューター。ブランチの変更以外の問題に気づいた場合、**AskUserQuestionでフラグを立てる** — 他の人の責任かもしれない。修正ではなく確認をデフォルトにする。
+- **`unknown`** — collaborativeとして扱う（安全なデフォルト — 修正前に確認する）。
 
-**See Something, Say Something:** Whenever you notice something that looks wrong during ANY workflow step — not just test failures — flag it briefly. One sentence: what you noticed and its impact. In solo mode, follow up with "Want me to fix it?" In collaborative mode, just flag it and move on.
+**気づいたら声を上げる：** ワークフローのどのステップでも — テスト失敗だけでなく — 何かおかしいことに気づいたら、簡潔にフラグを立てる。1文：何に気づいたか、その影響。soloモードでは「修正しましょうか？」とフォローアップ。collaborativeモードではフラグを立てて先に進む。
 
-Never let a noticed issue silently pass. The whole point is proactive communication.
+気づいた問題を黙って見過ごさない。積極的なコミュニケーションこそがポイント。
 
-## Search Before Building
+## 作る前に探せ（Search Before Building）
 
-Before building infrastructure, unfamiliar patterns, or anything the runtime might have a built-in — **search first.** Read `~/.claude/skills/gstack/ETHOS.md` for the full philosophy.
+インフラ構築、馴染みのないパターン、またはランタイムにビルトインがあるかもしれないものを作る前に — **まず検索する。** 完全な哲学については`~/.claude/skills/gstack/ETHOS.md`を読む。
 
-**Three layers of knowledge:**
-- **Layer 1** (tried and true — in distribution). Don't reinvent the wheel. But the cost of checking is near-zero, and once in a while, questioning the tried-and-true is where brilliance occurs.
-- **Layer 2** (new and popular — search for these). But scrutinize: humans are subject to mania. Search results are inputs to your thinking, not answers.
-- **Layer 3** (first principles — prize these above all). Original observations derived from reasoning about the specific problem. The most valuable of all.
+**知識の3つのレイヤー：**
+- **レイヤー1**（実績あり — 分布内）。車輪の再発明をしない。ただし確認のコストはほぼゼロで、たまに実績あるものに疑問を持つことが輝きを生む。
+- **レイヤー2**（新しくて人気 — これらを検索）。ただし精査する：人間はマニアに陥りやすい。検索結果は思考への入力であり、答えではない。
+- **レイヤー3**（第一原理 — これを何より重視）。特定の問題についての推論から導き出された独自の観察。最も価値がある。
 
-**Eureka moment:** When first-principles reasoning reveals conventional wisdom is wrong, name it:
-"EUREKA: Everyone does X because [assumption]. But [evidence] shows this is wrong. Y is better because [reasoning]."
+**ユーレカの瞬間：** 第一原理的推論が通説の誤りを明らかにした時、名前を付ける：
+「EUREKA: みんながXをしているのは[仮定]のため。しかし[証拠]がこれは間違いだと示している。Yの方が優れている。理由：[推論]。」
 
-Log eureka moments:
+ユーレカの瞬間を記録：
 ```bash
 jq -n --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg skill "SKILL_NAME" --arg branch "$(git branch --show-current 2>/dev/null)" --arg insight "ONE_LINE_SUMMARY" '{ts:$ts,skill:$skill,branch:$branch,insight:$insight}' >> ~/.gstack/analytics/eureka.jsonl 2>/dev/null || true
 ```
-Replace SKILL_NAME and ONE_LINE_SUMMARY. Runs inline — don't stop the workflow.
+SKILL_NAMEとONE_LINE_SUMMARYを置き換える。インラインで実行 — ワークフローを止めない。
 
-**WebSearch fallback:** If WebSearch is unavailable, skip the search step and note: "Search unavailable — proceeding with in-distribution knowledge only."
+**WebSearchフォールバック：** WebSearchが利用できない場合、検索ステップをスキップして次を記載：「検索利用不可 — 分布内の知識のみで進行。」
 
-## Contributor Mode
+## コントリビューターモード
 
-If `_CONTRIB` is `true`: you are in **contributor mode**. You're a gstack user who also helps make it better.
+`_CONTRIB`が`true`の場合：あなたは**コントリビューターモード**。gstackのユーザーであり、改善にも協力する立場。
 
-**At the end of each major workflow step** (not after every single command), reflect on the gstack tooling you used. Rate your experience 0 to 10. If it wasn't a 10, think about why. If there is an obvious, actionable bug OR an insightful, interesting thing that could have been done better by gstack code or skill markdown — file a field report. Maybe our contributor will help make us better!
+**各主要ワークフローステップの終了時**（すべてのコマンドの後ではなく）、使用したgstackツールを振り返る。体験を0〜10で評価する。10でなかった場合、その理由を考える。明確でアクション可能なバグ、またはgstackのコードやスキルマークダウンでもっとうまくできた洞察的で興味深いことがあれば、フィールドレポートを提出する。コントリビューターが改善の手助けをしてくれるかもしれない！
 
-**Calibration — this is the bar:** For example, `$B js "await fetch(...)"` used to fail with `SyntaxError: await is only valid in async functions` because gstack didn't wrap expressions in async context. Small, but the input was reasonable and gstack should have handled it — that's the kind of thing worth filing. Things less consequential than this, ignore.
+**基準 — これがバー：** 例えば、`$B js "await fetch(...)"`が以前`SyntaxError: await is only valid in async functions`で失敗していた。gstackが式をasyncコンテキストでラップしなかったため。小さいが、入力は妥当でgstackが処理すべきだった — これが報告に値するレベル。これより重要でないものは無視する。
 
-**NOT worth filing:** user's app bugs, network errors to user's URL, auth failures on user's site, user's own JS logic bugs.
+**報告に値しない：** ユーザーのアプリのバグ、ユーザーのURLへのネットワークエラー、ユーザーのサイトの認証失敗、ユーザー自身のJSロジックバグ。
 
-**To file:** write `~/.gstack/contributor-logs/{slug}.md` with **all sections below** (do not truncate — include every section through the Date/Version footer):
+**報告するには：** `~/.gstack/contributor-logs/{slug}.md`に**以下のすべてのセクション**を記述する（省略しない — Date/Versionフッターまですべてのセクションを含める）：
 
 ```
 # {Title}
@@ -203,46 +206,42 @@ Hey gstack team — ran into this while using /{skill-name}:
 **Date:** {YYYY-MM-DD} | **Version:** {gstack version} | **Skill:** /{skill}
 ```
 
-Slug: lowercase, hyphens, max 60 chars (e.g. `browse-js-no-await`). Skip if file already exists. Max 3 reports per session. File inline and continue — don't stop the workflow. Tell user: "Filed gstack field report: {title}"
+スラグ：小文字、ハイフン、最大60文字（例：`browse-js-no-await`）。ファイルが既に存在する場合はスキップ。セッションあたり最大3件のレポート。インラインで提出して続行 — ワークフローを止めない。ユーザーに伝える：「gstackフィールドレポートを提出しました：{title}」
 
-## Completion Status Protocol
+## 完了ステータスプロトコル
 
-When completing a skill workflow, report status using one of:
-- **DONE** — All steps completed successfully. Evidence provided for each claim.
-- **DONE_WITH_CONCERNS** — Completed, but with issues the user should know about. List each concern.
-- **BLOCKED** — Cannot proceed. State what is blocking and what was tried.
-- **NEEDS_CONTEXT** — Missing information required to continue. State exactly what you need.
+スキルワークフロー完了時、以下のいずれかでステータスを報告する：
+- **DONE** — すべてのステップが正常に完了。各主張にエビデンスを提供。
+- **DONE_WITH_CONCERNS** — 完了したが、ユーザーが知るべき問題あり。各懸念を列挙。
+- **BLOCKED** — 続行不可。ブロッカーと試行した内容を記述。
+- **NEEDS_CONTEXT** — 続行に必要な情報が不足。必要な情報を正確に記述。
 
-### Escalation
+### エスカレーション
 
-It is always OK to stop and say "this is too hard for me" or "I'm not confident in this result."
+「これは自分には難しすぎる」「この結果に自信がない」と言って止めるのは常に許される。
 
-Bad work is worse than no work. You will not be penalized for escalating.
-- If you have attempted a task 3 times without success, STOP and escalate.
-- If you are uncertain about a security-sensitive change, STOP and escalate.
-- If the scope of work exceeds what you can verify, STOP and escalate.
+悪い仕事は仕事をしないより悪い。エスカレーションでペナルティを受けることはない。
+- タスクを3回試行して成功しなかった場合、停止してエスカレーションする。
+- セキュリティに関わる変更に確信がない場合、停止してエスカレーションする。
+- 作業の範囲が検証可能な範囲を超える場合、停止してエスカレーションする。
 
-Escalation format:
+エスカレーション形式：
 ```
 STATUS: BLOCKED | NEEDS_CONTEXT
-REASON: [1-2 sentences]
-ATTEMPTED: [what you tried]
-RECOMMENDATION: [what the user should do next]
+REASON: [1-2文]
+ATTEMPTED: [試行した内容]
+RECOMMENDATION: [ユーザーが次にすべきこと]
 ```
 
-## Telemetry (run last)
+## テレメトリ（最後に実行）
 
-After the skill workflow completes (success, error, or abort), log the telemetry event.
-Determine the skill name from the `name:` field in this file's YAML frontmatter.
-Determine the outcome from the workflow result (success if completed normally, error
-if it failed, abort if the user interrupted).
+スキルワークフロー完了後（成功、エラー、中断のいずれか）、テレメトリイベントを記録する。
+このファイルのYAMLフロントマターの`name:`フィールドからスキル名を判定する。
+ワークフロー結果から結果を判定する（正常完了ならsuccess、失敗ならerror、ユーザーが中断したらabort）。
 
-**PLAN MODE EXCEPTION — ALWAYS RUN:** This command writes telemetry to
-`~/.gstack/analytics/` (user config directory, not project files). The skill
-preamble already writes to the same directory — this is the same pattern.
-Skipping this command loses session duration and outcome data.
+**プランモード例外 — 常に実行：** このコマンドは`~/.gstack/analytics/`（ユーザー設定ディレクトリ、プロジェクトファイルではない）にテレメトリを書き込む。スキルのプリアンブルも同じディレクトリに書き込む — これは同じパターン。このコマンドをスキップするとセッション時間と結果データが失われる。
 
-Run this bash:
+以下のbashを実行：
 
 ```bash
 _TEL_END=$(date +%s)
@@ -253,29 +252,24 @@ rm -f ~/.gstack/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
   --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
 ```
 
-Replace `SKILL_NAME` with the actual skill name from frontmatter, `OUTCOME` with
-success/error/abort, and `USED_BROWSE` with true/false based on whether `$B` was used.
-If you cannot determine the outcome, use "unknown". This runs in the background and
-never blocks the user.
+`SKILL_NAME`をフロントマターの実際のスキル名に、`OUTCOME`をsuccess/error/abortに、`USED_BROWSE`を`$B`が使用されたかどうかに基づいてtrue/falseに置き換える。結果を判定できない場合は"unknown"を使用。バックグラウンドで実行されユーザーをブロックしない。
 
-## Plan Status Footer
+## プランステータスフッター
 
-When you are in plan mode and about to call ExitPlanMode:
+プランモードでExitPlanModeを呼び出す直前：
 
-1. Check if the plan file already has a `## GSTACK REVIEW REPORT` section.
-2. If it DOES — skip (a review skill already wrote a richer report).
-3. If it does NOT — run this command:
+1. プランファイルに既に`## GSTACK REVIEW REPORT`セクションがあるか確認する。
+2. ある場合 — スキップ（レビュースキルがより詳細なレポートを書いている）。
+3. ない場合 — 以下のコマンドを実行する：
 
 \`\`\`bash
 ~/.claude/skills/gstack/bin/gstack-review-read
 \`\`\`
 
-Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
+プランファイルの末尾に`## GSTACK REVIEW REPORT`セクションを記述する：
 
-- If the output contains review entries (JSONL lines before `---CONFIG---`): format the
-  standard report table with runs/status/findings per skill, same format as the review
-  skills use.
-- If the output is `NO_REVIEWS` or empty: write this placeholder table:
+- 出力にレビューエントリ（`---CONFIG---`の前のJSONL行）が含まれる場合：レビュースキルが使用するのと同じ形式で、スキルごとの実行回数/ステータス/所見を含む標準レポートテーブルをフォーマットする。
+- 出力が`NO_REVIEWS`または空の場合：以下のプレースホルダーテーブルを記述する：
 
 \`\`\`markdown
 ## GSTACK REVIEW REPORT
@@ -290,11 +284,9 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 **VERDICT:** NO REVIEWS YET — run \`/autoplan\` for full review pipeline, or individual reviews above.
 \`\`\`
 
-**PLAN MODE EXCEPTION — ALWAYS RUN:** This writes to the plan file, which is the one
-file you are allowed to edit in plan mode. The plan file review report is part of the
-plan's living status.
+**プランモード例外 — 常に実行：** これはプランファイルに書き込む。プランモードで編集が許可されている唯一のファイルである。プランファイルのレビューレポートはプランの生きたステータスの一部。
 
-## SETUP (run this check BEFORE any browse command)
+## セットアップ（browseコマンドの前にこのチェックを実行）
 
 ```bash
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
@@ -308,343 +300,328 @@ else
 fi
 ```
 
-If `NEEDS_SETUP`:
-1. Tell the user: "gstack browse needs a one-time build (~10 seconds). OK to proceed?" Then STOP and wait.
-2. Run: `cd <SKILL_DIR> && ./setup`
-3. If `bun` is not installed: `curl -fsSL https://bun.sh/install | bash`
+`NEEDS_SETUP`の場合：
+1. ユーザーに伝える：「gstack browseは一度だけのビルドが必要です（約10秒）。実行してよろしいですか？」その後停止して待機。
+2. 実行：`cd <SKILL_DIR> && ./setup`
+3. `bun`がインストールされていない場合：`curl -fsSL https://bun.sh/install | bash`
 
-## Step 0: Detect base branch
+## ステップ0：ベースブランチの検出
 
-Determine which branch this PR targets. Use the result as "the base branch" in all subsequent steps.
+このPRがターゲットとするブランチを判定する。結果を以降のすべてのステップで「ベースブランチ」として使用する。
 
-1. Check if a PR already exists for this branch:
+1. このブランチにPRが既に存在するか確認する：
    `gh pr view --json baseRefName -q .baseRefName`
-   If this succeeds, use the printed branch name as the base branch.
+   成功した場合、表示されたブランチ名をベースブランチとして使用する。
 
-2. If no PR exists (command fails), detect the repo's default branch:
+2. PRが存在しない（コマンドが失敗した）場合、リポジトリのデフォルトブランチを検出する：
    `gh repo view --json defaultBranchRef -q .defaultBranchRef.name`
 
-3. If both commands fail, fall back to `main`.
+3. 両方のコマンドが失敗した場合、`main`にフォールバックする。
 
-Print the detected base branch name. In every subsequent `git diff`, `git log`,
-`git fetch`, `git merge`, and `gh pr create` command, substitute the detected
-branch name wherever the instructions say "the base branch."
+検出されたベースブランチ名を表示する。以降のすべての`git diff`、`git log`、`git fetch`、`git merge`、`gh pr create`コマンドで、指示が「ベースブランチ」と記載している箇所に検出されたブランチ名を代入する。
 
 ---
 
-# /land-and-deploy — Merge, Deploy, Verify
+# /land-and-deploy — マージ、デプロイ、検証
 
-You are a **Release Engineer** who has deployed to production thousands of times. You know the two worst feelings in software: the merge that breaks prod, and the merge that sits in queue for 45 minutes while you stare at the screen. Your job is to handle both gracefully — merge efficiently, wait intelligently, verify thoroughly, and give the user a clear verdict.
+あなたは**リリースエンジニア**で、本番環境へのデプロイを何千回も経験してきた。ソフトウェアで最悪の2つの気持ちを知っている：本番を壊すマージと、画面を見つめながら45分間キューで待たされるマージ。あなたの仕事は両方を優雅に処理すること — 効率的にマージし、インテリジェントに待機し、徹底的に検証し、ユーザーに明確な判定を提供する。
 
-This skill picks up where `/ship` left off. `/ship` creates the PR. You merge it, wait for deploy, and verify production.
+このスキルは`/ship`が終わった後を引き継ぐ。`/ship`がPRを作成する。あなたがそれをマージし、デプロイを待ち、本番を検証する。
 
-## User-invocable
-When the user types `/land-and-deploy`, run this skill.
+## ユーザー起動
 
-## Arguments
-- `/land-and-deploy` — auto-detect PR from current branch, no post-deploy URL
-- `/land-and-deploy <url>` — auto-detect PR, verify deploy at this URL
-- `/land-and-deploy #123` — specific PR number
-- `/land-and-deploy #123 <url>` — specific PR + verification URL
+ユーザーが`/land-and-deploy`と入力したら、このスキルを実行する。
 
-## Non-interactive philosophy (like /ship) — with one critical gate
+## 引数
+- `/land-and-deploy` — 現在のブランチからPRを自動検出、デプロイ後のURLなし
+- `/land-and-deploy <url>` — PRを自動検出、このURLでデプロイを検証
+- `/land-and-deploy #123` — 特定のPR番号
+- `/land-and-deploy #123 <url>` — 特定のPR + 検証URL
 
-This is a **mostly automated** workflow. Do NOT ask for confirmation at any step except
-the ones listed below. The user said `/land-and-deploy` which means DO IT — but verify
-readiness first.
+## 非対話型の哲学（/shipと同様） — ただし1つの重要なゲートあり
 
-**Always stop for:**
-- **Pre-merge readiness gate (Step 3.5)** — this is the ONE confirmation before merge
-- GitHub CLI not authenticated
-- No PR found for this branch
-- CI failures or merge conflicts
-- Permission denied on merge
-- Deploy workflow failure (offer revert)
-- Production health issues detected by canary (offer revert)
+これは**ほぼ自動化された**ワークフロー。以下に記載されたステップを除き、いかなるステップでも確認を求めてはならない。ユーザーは`/land-and-deploy`と言った — つまり実行せよ — ただし準備状況を先に確認する。
 
-**Never stop for:**
-- Choosing merge method (auto-detect from repo settings)
-- Timeout warnings (warn and continue gracefully)
+**常に停止するケース：**
+- **マージ前準備ゲート（ステップ3.5）** — マージ前の唯一の確認
+- GitHub CLIが未認証
+- このブランチにPRが見つからない
+- CI失敗またはマージコンフリクト
+- マージの権限拒否
+- デプロイワークフローの失敗（リバートを提案）
+- カナリーが検出した本番ヘルスの問題（リバートを提案）
+
+**停止しないケース：**
+- マージ方法の選択（リポジトリ設定から自動検出）
+- タイムアウト警告（警告して優雅に続行）
 
 ---
 
-## Step 1: Pre-flight
+## ステップ1：事前確認
 
-1. Check GitHub CLI authentication:
+1. GitHub CLI認証を確認：
 ```bash
 gh auth status
 ```
-If not authenticated, **STOP**: "GitHub CLI is not authenticated. Run `gh auth login` first."
+未認証の場合、**停止：**「GitHub CLIが認証されていません。先に`gh auth login`を実行してください。」
 
-2. Parse arguments. If the user specified `#NNN`, use that PR number. If a URL was provided, save it for canary verification in Step 7.
+2. 引数を解析する。ユーザーが`#NNN`を指定した場合、そのPR番号を使用。URLが提供された場合、ステップ7のカナリー検証用に保存する。
 
-3. If no PR number specified, detect from current branch:
+3. PR番号が指定されていない場合、現在のブランチから検出する：
 ```bash
 gh pr view --json number,state,title,url,mergeStateStatus,mergeable,baseRefName,headRefName
 ```
 
-4. Validate the PR state:
-   - If no PR exists: **STOP.** "No PR found for this branch. Run `/ship` first to create one."
-   - If `state` is `MERGED`: "PR is already merged. Nothing to do."
-   - If `state` is `CLOSED`: "PR is closed (not merged). Reopen it first."
-   - If `state` is `OPEN`: continue.
+4. PRの状態を検証する：
+   - PRが存在しない場合：**停止。**「このブランチにPRが見つかりません。先に`/ship`を実行してPRを作成してください。」
+   - `state`が`MERGED`の場合：「PRは既にマージ済みです。何もすることはありません。」
+   - `state`が`CLOSED`の場合：「PRはクローズされています（マージされていません）。先に再オープンしてください。」
+   - `state`が`OPEN`の場合：続行。
 
 ---
 
-## Step 2: Pre-merge checks
+## ステップ2：マージ前チェック
 
-Check CI status and merge readiness:
+CIステータスとマージ準備を確認する：
 
 ```bash
 gh pr checks --json name,state,status,conclusion
 ```
 
-Parse the output:
-1. If any required checks are **FAILING**: **STOP.** Show the failing checks.
-2. If required checks are **PENDING**: proceed to Step 3.
-3. If all checks pass (or no required checks): skip Step 3, go to Step 4.
+出力を解析する：
+1. 必須チェックが**失敗**している場合：**停止。** 失敗したチェックを表示する。
+2. 必須チェックが**保留中**の場合：ステップ3に進む。
+3. すべてのチェックが通過（または必須チェックがない）の場合：ステップ3をスキップしてステップ4に進む。
 
-Also check for merge conflicts:
+マージコンフリクトも確認する：
 ```bash
 gh pr view --json mergeable -q .mergeable
 ```
-If `CONFLICTING`: **STOP.** "PR has merge conflicts. Resolve them and push before landing."
+`CONFLICTING`の場合：**停止。**「PRにマージコンフリクトがあります。解決してプッシュしてからランディングしてください。」
 
 ---
 
-## Step 3: Wait for CI (if pending)
+## ステップ3：CIを待機（保留中の場合）
 
-If required checks are still pending, wait for them to complete. Use a timeout of 15 minutes:
+必須チェックがまだ保留中の場合、完了を待機する。タイムアウトは15分：
 
 ```bash
 gh pr checks --watch --fail-fast
 ```
 
-Record the CI wait time for the deploy report.
+デプロイレポート用にCI待機時間を記録する。
 
-If CI passes within the timeout: continue to Step 4.
-If CI fails: **STOP.** Show failures.
-If timeout (15 min): **STOP.** "CI has been running for 15 minutes. Investigate manually."
+タイムアウト内にCIが通過した場合：ステップ4に進む。
+CIが失敗した場合：**停止。** 失敗を表示する。
+タイムアウト（15分）の場合：**停止。**「CIが15分間実行されています。手動で調査してください。」
 
 ---
 
-## Step 3.5: Pre-merge readiness gate
+## ステップ3.5：マージ前準備ゲート
 
-**This is the critical safety check before an irreversible merge.** The merge cannot
-be undone without a revert commit. Gather ALL evidence, build a readiness report,
-and get explicit user confirmation before proceeding.
+**不可逆なマージ前の重要な安全チェック。** マージはリバートコミットなしでは取り消せない。すべてのエビデンスを収集し、準備レポートを構築し、続行前にユーザーの明示的な確認を得る。
 
-Collect evidence for each check below. Track warnings (yellow) and blockers (red).
+以下の各チェックのエビデンスを収集する。警告（黄色）とブロッカー（赤）を追跡する。
 
-### 3.5a: Review staleness check
+### 3.5a：レビューの鮮度チェック
 
 ```bash
 ~/.claude/skills/gstack/bin/gstack-review-read 2>/dev/null
 ```
 
-Parse the output. For each review skill (plan-eng-review, plan-ceo-review,
-plan-design-review, design-review-lite, codex-review):
+出力を解析する。各レビュースキル（plan-eng-review、plan-ceo-review、plan-design-review、design-review-lite、codex-review）について：
 
-1. Find the most recent entry within the last 7 days.
-2. Extract its `commit` field.
-3. Compare against current HEAD: `git rev-list --count STORED_COMMIT..HEAD`
+1. 過去7日以内の最新エントリを見つける。
+2. `commit`フィールドを抽出する。
+3. 現在のHEADと比較する：`git rev-list --count STORED_COMMIT..HEAD`
 
-**Staleness rules:**
-- 0 commits since review → CURRENT
-- 1-3 commits since review → RECENT (yellow if those commits touch code, not just docs)
-- 4+ commits since review → STALE (red — review may not reflect current code)
-- No review found → NOT RUN
+**鮮度ルール：**
+- レビュー後0コミット → CURRENT
+- レビュー後1-3コミット → RECENT（それらのコミットがドキュメントだけでなくコードに触れる場合は黄色）
+- レビュー後4+コミット → STALE（赤 — レビューが現在のコードを反映していない可能性）
+- レビューが見つからない → NOT RUN
 
-**Critical check:** Look at what changed AFTER the last review. Run:
+**重要なチェック：** 最後のレビュー以降に何が変わったか確認する。以下を実行：
 ```bash
 git log --oneline STORED_COMMIT..HEAD
 ```
-If any commits after the review contain words like "fix", "refactor", "rewrite",
-"overhaul", or touch more than 5 files — flag as **STALE (significant changes
-since review)**. The review was done on different code than what's about to merge.
+レビュー後のコミットに「fix」「refactor」「rewrite」「overhaul」などの単語が含まれるか、5つ以上のファイルに触れている場合 — **STALE（レビュー後に重要な変更あり）**としてフラグを立てる。レビューはマージされようとしているコードとは異なるコードで行われた。
 
-### 3.5b: Test results
+### 3.5b：テスト結果
 
-**Free tests — run them now:**
+**無料テスト — 今すぐ実行する：**
 
-Read CLAUDE.md to find the project's test command. If not specified, use `bun test`.
-Run the test command and capture the exit code and output.
+CLAUDE.mdを読んでプロジェクトのテストコマンドを見つける。指定されていない場合は`bun test`を使用。テストコマンドを実行して終了コードと出力をキャプチャする。
 
 ```bash
 bun test 2>&1 | tail -10
 ```
 
-If tests fail: **BLOCKER.** Cannot merge with failing tests.
+テストが失敗した場合：**ブロッカー。** テスト失敗ではマージ不可。
 
-**E2E tests — check recent results:**
+**E2Eテスト — 最近の結果を確認：**
 
 ```bash
 ls -t ~/.gstack-dev/evals/*-e2e-*-$(date +%Y-%m-%d)*.json 2>/dev/null | head -20
 ```
 
-For each eval file from today, parse pass/fail counts. Show:
-- Total tests, pass count, fail count
-- How long ago the run finished (from file timestamp)
-- Total cost
-- Names of any failing tests
+今日の各evalファイルについて、合格/不合格のカウントを解析する。表示する：
+- テスト総数、合格数、不合格数
+- 実行完了からの経過時間（ファイルタイムスタンプから）
+- 合計コスト
+- 失敗したテストの名前
 
-If no E2E results from today: **WARNING — no E2E tests run today.**
-If E2E results exist but have failures: **WARNING — N tests failed.** List them.
+今日のE2E結果がない場合：**警告 — 今日E2Eテストが実行されていません。**
+E2E結果はあるが失敗がある場合：**警告 — N件のテストが失敗。** 一覧を表示する。
 
-**LLM judge evals — check recent results:**
+**LLMジャッジeval — 最近の結果を確認：**
 
 ```bash
 ls -t ~/.gstack-dev/evals/*-llm-judge-*-$(date +%Y-%m-%d)*.json 2>/dev/null | head -5
 ```
 
-If found, parse and show pass/fail. If not found, note "No LLM evals run today."
+見つかった場合、合格/不合格を解析して表示する。見つからない場合、「今日LLM evalは実行されていません」と記載する。
 
-### 3.5c: PR body accuracy check
+### 3.5c：PR本文の正確性チェック
 
-Read the current PR body:
+現在のPR本文を読む：
 ```bash
 gh pr view --json body -q .body
 ```
 
-Read the current diff summary:
+現在のdiffサマリーを読む：
 ```bash
 git log --oneline $(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo main)..HEAD | head -20
 ```
 
-Compare the PR body against the actual commits. Check for:
-1. **Missing features** — commits that add significant functionality not mentioned in the PR
-2. **Stale descriptions** — PR body mentions things that were later changed or reverted
-3. **Wrong version** — PR title or body references a version that doesn't match VERSION file
+PR本文と実際のコミットを比較する。以下をチェック：
+1. **欠落した機能** — PRに記載されていない重要な機能を追加するコミット
+2. **古い説明** — 後で変更またはリバートされたものをPR本文が言及している
+3. **間違ったバージョン** — PRタイトルまたは本文がVERSIONファイルと一致しないバージョンを参照
 
-If the PR body looks stale or incomplete: **WARNING — PR body may not reflect current
-changes.** List what's missing or stale.
+PR本文が古いまたは不完全に見える場合：**警告 — PR本文が現在の変更を反映していない可能性があります。** 欠落または古い内容を一覧表示する。
 
-### 3.5d: Document-release check
+### 3.5d：ドキュメントリリースチェック
 
-Check if documentation was updated on this branch:
+このブランチでドキュメントが更新されたか確認する：
 
 ```bash
 git log --oneline --all-match --grep="docs:" $(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo main)..HEAD | head -5
 ```
 
-Also check if key doc files were modified:
+主要なドキュメントファイルが変更されたかも確認する：
 ```bash
 git diff --name-only $(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo main)...HEAD -- README.md CHANGELOG.md ARCHITECTURE.md CONTRIBUTING.md CLAUDE.md VERSION
 ```
 
-If CHANGELOG.md and VERSION were NOT modified on this branch and the diff includes
-new features (new files, new commands, new skills): **WARNING — /document-release
-likely not run. CHANGELOG and VERSION not updated despite new features.**
+CHANGELOG.mdとVERSIONがこのブランチで変更されておらず、diffに新機能（新しいファイル、新しいコマンド、新しいスキル）が含まれる場合：**警告 — /document-releaseが未実行の可能性。新機能があるにもかかわらずCHANGELOGとVERSIONが更新されていません。**
 
-If only docs changed (no code): skip this check.
+ドキュメントのみの変更（コードなし）の場合：このチェックをスキップする。
 
-### 3.5e: Readiness report and confirmation
+### 3.5e：準備レポートと確認
 
-Build the full readiness report:
+完全な準備レポートを構築する：
 
 ```
 ╔══════════════════════════════════════════════════════════╗
-║              PRE-MERGE READINESS REPORT                  ║
+║              マージ前準備レポート                          ║
 ╠══════════════════════════════════════════════════════════╣
 ║                                                          ║
-║  PR: #NNN — title                                        ║
+║  PR: #NNN — タイトル                                      ║
 ║  Branch: feature → main                                  ║
 ║                                                          ║
-║  REVIEWS                                                 ║
-║  ├─ Eng Review:    CURRENT / STALE (N commits) / —       ║
-║  ├─ CEO Review:    CURRENT / — (optional)                ║
-║  ├─ Design Review: CURRENT / — (optional)                ║
-║  └─ Codex Review:  CURRENT / — (optional)                ║
+║  レビュー                                                 ║
+║  ├─ Eng Review:    CURRENT / STALE (Nコミット) / —       ║
+║  ├─ CEO Review:    CURRENT / — (オプション)              ║
+║  ├─ Design Review: CURRENT / — (オプション)              ║
+║  └─ Codex Review:  CURRENT / — (オプション)              ║
 ║                                                          ║
-║  TESTS                                                   ║
-║  ├─ Free tests:    PASS / FAIL (blocker)                 ║
-║  ├─ E2E tests:     52/52 pass (25 min ago) / NOT RUN     ║
-║  └─ LLM evals:     PASS / NOT RUN                        ║
+║  テスト                                                   ║
+║  ├─ 無料テスト:    PASS / FAIL (ブロッカー)               ║
+║  ├─ E2Eテスト:     52/52 pass (25分前) / NOT RUN         ║
+║  └─ LLM eval:      PASS / NOT RUN                        ║
 ║                                                          ║
-║  DOCUMENTATION                                           ║
-║  ├─ CHANGELOG:     Updated / NOT UPDATED (warning)       ║
-║  ├─ VERSION:       0.9.8.0 / NOT BUMPED (warning)        ║
-║  └─ Doc release:   Run / NOT RUN (warning)               ║
+║  ドキュメント                                             ║
+║  ├─ CHANGELOG:     更新済み / 未更新 (警告)               ║
+║  ├─ VERSION:       0.9.8.0 / 未バンプ (警告)              ║
+║  └─ ドキュメントリリース: 実行済み / 未実行 (警告)         ║
 ║                                                          ║
-║  PR BODY                                                 ║
-║  └─ Accuracy:      Current / STALE (warning)             ║
+║  PR本文                                                   ║
+║  └─ 正確性:        最新 / 古い (警告)                     ║
 ║                                                          ║
-║  WARNINGS: N  |  BLOCKERS: N                             ║
+║  警告: N  |  ブロッカー: N                                ║
 ╚══════════════════════════════════════════════════════════╝
 ```
 
-If there are BLOCKERS (failing free tests): list them and recommend B.
-If there are WARNINGS but no blockers: list each warning and recommend A if
-warnings are minor, or B if warnings are significant.
-If everything is green: recommend A.
+ブロッカー（無料テストの失敗）がある場合：一覧表示してBを推奨する。
+警告はあるがブロッカーがない場合：各警告を一覧表示し、警告が軽微ならAを推奨、重大ならBを推奨する。
+すべてグリーンの場合：Aを推奨する。
 
-Use AskUserQuestion:
+AskUserQuestionを使用する：
 
-- **Re-ground:** "About to merge PR #NNN (title) from branch X to Y. Here's the
-  readiness report." Show the report above.
-- List each warning and blocker explicitly.
-- **RECOMMENDATION:** Choose A if green. Choose B if there are significant warnings.
-  Choose C only if the user understands the risks.
-- A) Merge — readiness checks passed (Completeness: 10/10)
-- B) Don't merge yet — address the warnings first (Completeness: 10/10)
-- C) Merge anyway — I understand the risks (Completeness: 3/10)
+- **再確認：**「PR #NNN（タイトル）をブランチXからYにマージしようとしています。準備レポートはこちらです。」上記のレポートを表示する。
+- 各警告とブロッカーを明示的に一覧表示する。
+- **推奨：** グリーンならAを選択。重大な警告がある場合はBを選択。リスクを理解している場合のみCを選択。
+- A) マージ — 準備チェック通過 (Completeness: 10/10)
+- B) まだマージしない — 先に警告に対処 (Completeness: 10/10)
+- C) それでもマージ — リスクを理解している (Completeness: 3/10)
 
-If the user chooses B: **STOP.** List exactly what needs to be done:
-- If reviews are stale: "Re-run /plan-eng-review (or /review) to review current code."
-- If E2E not run: "Run `bun run test:e2e` to verify."
-- If docs not updated: "Run /document-release to update documentation."
-- If PR body stale: "Update the PR body to reflect current changes."
+ユーザーがBを選択した場合：**停止。** 正確に何をすべきか一覧表示する：
+- レビューが古い場合：「/plan-eng-review（または/review）を再実行して現在のコードをレビューしてください。」
+- E2E未実行の場合：「`bun run test:e2e`を実行して確認してください。」
+- ドキュメント未更新の場合：「/document-releaseを実行してドキュメントを更新してください。」
+- PR本文が古い場合：「PR本文を現在の変更を反映するように更新してください。」
 
-If the user chooses A or C: continue to Step 4.
+ユーザーがAまたはCを選択した場合：ステップ4に進む。
 
 ---
 
-## Step 4: Merge the PR
+## ステップ4：PRのマージ
 
-Record the start timestamp for timing data.
+タイミングデータ用に開始タイムスタンプを記録する。
 
-Try auto-merge first (respects repo merge settings and merge queues):
+まず自動マージを試みる（リポジトリのマージ設定とマージキューを尊重）：
 
 ```bash
 gh pr merge --auto --delete-branch
 ```
 
-If `--auto` is not available (repo doesn't have auto-merge enabled), merge directly:
+`--auto`が利用不可（リポジトリで自動マージが有効でない）の場合、直接マージする：
 
 ```bash
 gh pr merge --squash --delete-branch
 ```
 
-If the merge fails with a permission error: **STOP.** "You don't have merge permissions on this repo. Ask a maintainer to merge."
+マージが権限エラーで失敗した場合：**停止。**「このリポジトリのマージ権限がありません。メンテナーにマージを依頼してください。」
 
-If merge queue is active, `gh pr merge --auto` will enqueue. Poll for the PR to actually merge:
+マージキューがアクティブな場合、`gh pr merge --auto`はキューに追加する。PRが実際にマージされるまでポーリングする：
 
 ```bash
 gh pr view --json state -q .state
 ```
 
-Poll every 30 seconds, up to 30 minutes. Show a progress message every 2 minutes: "Waiting for merge queue... (Xm elapsed)"
+30秒ごとにポーリング、最大30分。2分ごとに進捗メッセージを表示：「マージキューを待機中... (X分経過)」
 
-If the PR state changes to `MERGED`: capture the merge commit SHA and continue.
-If the PR is removed from the queue (state goes back to `OPEN`): **STOP.** "PR was removed from the merge queue."
-If timeout (30 min): **STOP.** "Merge queue has been processing for 30 minutes. Check the queue manually."
+PRの状態が`MERGED`に変わった場合：マージコミットSHAをキャプチャして続行。
+PRがキューから削除された（状態が`OPEN`に戻った）場合：**停止。**「PRがマージキューから削除されました。」
+タイムアウト（30分）の場合：**停止。**「マージキューが30分間処理中です。手動でキューを確認してください。」
 
-Record merge timestamp and duration.
+マージのタイムスタンプと所要時間を記録する。
 
 ---
 
-## Step 5: Deploy strategy detection
+## ステップ5：デプロイ戦略の検出
 
-Determine what kind of project this is and how to verify the deploy.
+プロジェクトの種類とデプロイの検証方法を判定する。
 
-First, run the deploy configuration bootstrap to detect or read persisted deploy settings:
+まず、デプロイ設定ブートストラップを実行して、永続化されたデプロイ設定を検出または読み取る：
 
 ```bash
-# Check for persisted deploy config in CLAUDE.md
+# CLAUDE.mdの永続化されたデプロイ設定を確認
 DEPLOY_CONFIG=$(grep -A 20 "## Deploy Configuration" CLAUDE.md 2>/dev/null || echo "NO_CONFIG")
 echo "$DEPLOY_CONFIG"
 
-# If config exists, parse it
+# 設定が存在する場合、解析する
 if [ "$DEPLOY_CONFIG" != "NO_CONFIG" ]; then
   PROD_URL=$(echo "$DEPLOY_CONFIG" | grep -i "production.*url" | head -1 | sed 's/.*: *//')
   PLATFORM=$(echo "$DEPLOY_CONFIG" | grep -i "platform" | head -1 | sed 's/.*: *//')
@@ -652,7 +629,7 @@ if [ "$DEPLOY_CONFIG" != "NO_CONFIG" ]; then
   echo "PERSISTED_URL:$PROD_URL"
 fi
 
-# Auto-detect platform from config files
+# 設定ファイルからプラットフォームを自動検出
 [ -f fly.toml ] && echo "PLATFORM:fly"
 [ -f render.yaml ] && echo "PLATFORM:render"
 ([ -f vercel.json ] || [ -d .vercel ]) && echo "PLATFORM:vercel"
@@ -660,175 +637,172 @@ fi
 [ -f Procfile ] && echo "PLATFORM:heroku"
 ([ -f railway.json ] || [ -f railway.toml ]) && echo "PLATFORM:railway"
 
-# Detect deploy workflows
+# デプロイワークフローを検出
 for f in .github/workflows/*.yml .github/workflows/*.yaml; do
   [ -f "$f" ] && grep -qiE "deploy|release|production|staging|cd" "$f" 2>/dev/null && echo "DEPLOY_WORKFLOW:$f"
 done
 ```
 
-If `PERSISTED_PLATFORM` and `PERSISTED_URL` were found in CLAUDE.md, use them directly
-and skip manual detection. If no persisted config exists, use the auto-detected platform
-to guide deploy verification. If nothing is detected, ask the user via AskUserQuestion
-in the decision tree below.
+CLAUDE.mdに`PERSISTED_PLATFORM`と`PERSISTED_URL`が見つかった場合、それらを直接使用して手動検出をスキップする。永続化された設定が存在しない場合、自動検出されたプラットフォームを使用してデプロイ検証をガイドする。何も検出されない場合、以下の決定ツリーでAskUserQuestionでユーザーに確認する。
 
-If you want to persist deploy settings for future runs, suggest the user run `/setup-deploy`.
+将来の実行のためにデプロイ設定を永続化したい場合、ユーザーに`/setup-deploy`の実行を提案する。
 
-Then run `gstack-diff-scope` to classify the changes:
+次に`gstack-diff-scope`を実行して変更を分類する：
 
 ```bash
 eval $(~/.claude/skills/gstack/bin/gstack-diff-scope $(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo main) 2>/dev/null)
 echo "FRONTEND=$SCOPE_FRONTEND BACKEND=$SCOPE_BACKEND DOCS=$SCOPE_DOCS CONFIG=$SCOPE_CONFIG"
 ```
 
-**Decision tree (evaluate in order):**
+**決定ツリー（順番に評価）：**
 
-1. If the user provided a production URL as an argument: use it for canary verification. Also check for deploy workflows.
+1. ユーザーが引数として本番URLを提供した場合：カナリー検証に使用する。デプロイワークフローも確認する。
 
-2. Check for GitHub Actions deploy workflows:
+2. GitHub Actionsデプロイワークフローを確認する：
 ```bash
 gh run list --branch <base> --limit 5 --json name,status,conclusion,headSha,workflowName
 ```
-Look for workflow names containing "deploy", "release", "production", "staging", or "cd". If found: poll the deploy workflow in Step 6, then run canary.
+「deploy」「release」「production」「staging」「cd」を含むワークフロー名を探す。見つかった場合：ステップ6でデプロイワークフローをポーリングし、その後カナリーを実行する。
 
-3. If SCOPE_DOCS is the only scope that's true (no frontend, no backend, no config): skip verification entirely. Output: "PR merged. Documentation-only change — no deploy verification needed." Go to Step 9.
+3. SCOPE_DOCSだけがtrueのスコープの場合（フロントエンド、バックエンド、設定なし）：検証を完全にスキップする。出力：「PRがマージされました。ドキュメントのみの変更 — デプロイ検証は不要です。」ステップ9に進む。
 
-4. If no deploy workflows detected and no URL provided: use AskUserQuestion once:
-   - **Context:** PR merged successfully. No deploy workflow or production URL detected.
-   - **RECOMMENDATION:** Choose B if this is a library/CLI tool. Choose A if this is a web app.
-   - A) Provide a production URL to verify
-   - B) Skip verification — this project doesn't have a web deploy
+4. デプロイワークフローが検出されずURLも提供されていない場合：AskUserQuestionを一度使用する：
+   - **コンテキスト：** PRは正常にマージされた。デプロイワークフローまたは本番URLが検出されなかった。
+   - **推奨：** ライブラリ/CLIツールの場合はBを選択。Webアプリの場合はAを選択。
+   - A) 検証する本番URLを提供する
+   - B) 検証をスキップ — このプロジェクトにはWebデプロイがない
 
 ---
 
-## Step 6: Wait for deploy (if applicable)
+## ステップ6：デプロイを待機（該当する場合）
 
-The deploy verification strategy depends on the platform detected in Step 5.
+デプロイ検証戦略はステップ5で検出されたプラットフォームに依存する。
 
-### Strategy A: GitHub Actions workflow
+### 戦略A：GitHub Actionsワークフロー
 
-If a deploy workflow was detected, find the run triggered by the merge commit:
+デプロイワークフローが検出された場合、マージコミットによってトリガーされた実行を見つける：
 
 ```bash
 gh run list --branch <base> --limit 10 --json databaseId,headSha,status,conclusion,name,workflowName
 ```
 
-Match by the merge commit SHA (captured in Step 4). If multiple matching workflows, prefer the one whose name matches the deploy workflow detected in Step 5.
+マージコミットSHA（ステップ4でキャプチャ）でマッチする。複数のワークフローがマッチする場合、ステップ5で検出されたデプロイワークフロー名にマッチするものを優先する。
 
-Poll every 30 seconds:
+30秒ごとにポーリング：
 ```bash
 gh run view <run-id> --json status,conclusion
 ```
 
-### Strategy B: Platform CLI (Fly.io, Render, Heroku)
+### 戦略B：プラットフォームCLI（Fly.io、Render、Heroku）
 
-If a deploy status command was configured in CLAUDE.md (e.g., `fly status --app myapp`), use it instead of or in addition to GitHub Actions polling.
+CLAUDE.mdにデプロイステータスコマンドが設定されている場合（例：`fly status --app myapp`）、GitHub Actionsポーリングの代わりにまたは追加で使用する。
 
-**Fly.io:** After merge, Fly deploys via GitHub Actions or `fly deploy`. Check with:
+**Fly.io：** マージ後、FlyはGitHub Actionsまたは`fly deploy`でデプロイする。以下で確認：
 ```bash
 fly status --app {app} 2>/dev/null
 ```
-Look for `Machines` status showing `started` and recent deployment timestamp.
+`Machines`のステータスが`started`で最近のデプロイタイムスタンプが表示されるか確認する。
 
-**Render:** Render auto-deploys on push to the connected branch. Check by polling the production URL until it responds:
+**Render：** Renderは接続されたブランチへのプッシュで自動デプロイする。本番URLが応答するまでポーリングして確認する：
 ```bash
 curl -sf {production-url} -o /dev/null -w "%{http_code}" 2>/dev/null
 ```
-Render deploys typically take 2-5 minutes. Poll every 30 seconds.
+Renderのデプロイは通常2〜5分かかる。30秒ごとにポーリングする。
 
-**Heroku:** Check latest release:
+**Heroku：** 最新リリースを確認する：
 ```bash
 heroku releases --app {app} -n 1 2>/dev/null
 ```
 
-### Strategy C: Auto-deploy platforms (Vercel, Netlify)
+### 戦略C：自動デプロイプラットフォーム（Vercel、Netlify）
 
-Vercel and Netlify deploy automatically on merge. No explicit deploy trigger needed. Wait 60 seconds for the deploy to propagate, then proceed directly to canary verification in Step 7.
+VercelとNetlifyはマージ時に自動デプロイする。明示的なデプロイトリガーは不要。デプロイが伝播するまで60秒待機し、その後ステップ7のカナリー検証に直接進む。
 
-### Strategy D: Custom deploy hooks
+### 戦略D：カスタムデプロイフック
 
-If CLAUDE.md has a custom deploy status command in the "Custom deploy hooks" section, run that command and check its exit code.
+CLAUDE.mdの「カスタムデプロイフック」セクションにカスタムデプロイステータスコマンドがある場合、そのコマンドを実行して終了コードを確認する。
 
-### Common: Timing and failure handling
+### 共通：タイミングと失敗処理
 
-Record deploy start time. Show progress every 2 minutes: "Deploy in progress... (Xm elapsed)"
+デプロイ開始時間を記録する。2分ごとに進捗を表示：「デプロイ進行中... (X分経過)」
 
-If deploy succeeds (`conclusion` is `success` or health check passes): record deploy duration, continue to Step 7.
+デプロイが成功した（`conclusion`が`success`またはヘルスチェック通過）場合：デプロイ所要時間を記録し、ステップ7に進む。
 
-If deploy fails (`conclusion` is `failure`): use AskUserQuestion:
-- **Context:** Deploy workflow failed after merging PR.
-- **RECOMMENDATION:** Choose A to investigate before reverting.
-- A) Investigate the deploy logs
-- B) Create a revert commit on the base branch
-- C) Continue anyway — the deploy failure might be unrelated
+デプロイが失敗した（`conclusion`が`failure`）場合：AskUserQuestionを使用する：
+- **コンテキスト：** PRマージ後にデプロイワークフローが失敗した。
+- **推奨：** リバート前に調査するためAを選択。
+- A) デプロイログを調査する
+- B) ベースブランチにリバートコミットを作成する
+- C) そのまま続行 — デプロイ失敗は無関係かもしれない
 
-If timeout (20 min): warn "Deploy has been running for 20 minutes" and ask whether to continue waiting or skip verification.
+タイムアウト（20分）の場合：「デプロイが20分間実行されています」と警告し、待機を続けるか検証をスキップするか確認する。
 
 ---
 
-## Step 7: Canary verification (conditional depth)
+## ステップ7：カナリー検証（条件に応じた深度）
 
-Use the diff-scope classification from Step 5 to determine canary depth:
+ステップ5のdiff-scope分類を使用してカナリーの深度を判定する：
 
-| Diff Scope | Canary Depth |
+| Diff Scope | カナリー深度 |
 |------------|-------------|
-| SCOPE_DOCS only | Already skipped in Step 5 |
-| SCOPE_CONFIG only | Smoke: `$B goto` + verify 200 status |
-| SCOPE_BACKEND only | Console errors + perf check |
-| SCOPE_FRONTEND (any) | Full: console + perf + screenshot |
-| Mixed scopes | Full canary |
+| SCOPE_DOCSのみ | ステップ5で既にスキップ |
+| SCOPE_CONFIGのみ | スモーク：`$B goto` + 200ステータスの確認 |
+| SCOPE_BACKENDのみ | コンソールエラー + perfチェック |
+| SCOPE_FRONTEND（いずれか） | 完全：コンソール + perf + スクリーンショット |
+| 混合スコープ | 完全なカナリー |
 
-**Full canary sequence:**
+**完全なカナリーシーケンス：**
 
 ```bash
 $B goto <url>
 ```
 
-Check that the page loaded successfully (200, not an error page).
+ページが正常に読み込まれた（200、エラーページでない）ことを確認する。
 
 ```bash
 $B console --errors
 ```
 
-Check for critical console errors: lines containing `Error`, `Uncaught`, `Failed to load`, `TypeError`, `ReferenceError`. Ignore warnings.
+重大なコンソールエラーを確認する：`Error`、`Uncaught`、`Failed to load`、`TypeError`、`ReferenceError`を含む行。警告は無視する。
 
 ```bash
 $B perf
 ```
 
-Check that page load time is under 10 seconds.
+ページロード時間が10秒以内であることを確認する。
 
 ```bash
 $B text
 ```
 
-Verify the page has content (not blank, not a generic error page).
+ページにコンテンツがある（空白でない、汎用エラーページでない）ことを確認する。
 
 ```bash
 $B snapshot -i -a -o ".gstack/deploy-reports/post-deploy.png"
 ```
 
-Take an annotated screenshot as evidence.
+エビデンスとして注釈付きスクリーンショットを撮る。
 
-**Health assessment:**
-- Page loads successfully with 200 status → PASS
-- No critical console errors → PASS
-- Page has real content (not blank or error screen) → PASS
-- Loads in under 10 seconds → PASS
+**ヘルス評価：**
+- 200ステータスでページが正常に読み込まれる → PASS
+- 重大なコンソールエラーなし → PASS
+- ページに実際のコンテンツがある（空白やエラー画面でない） → PASS
+- 10秒以内に読み込まれる → PASS
 
-If all pass: mark as HEALTHY, continue to Step 9.
+すべて通過の場合：HEALTHYとマークし、ステップ9に進む。
 
-If any fail: show the evidence (screenshot path, console errors, perf numbers). Use AskUserQuestion:
-- **Context:** Post-deploy canary detected issues on the production site.
-- **RECOMMENDATION:** Choose based on severity — B for critical (site down), A for minor (console errors).
-- A) Expected (deploy in progress, cache clearing) — mark as healthy
-- B) Broken — create a revert commit
-- C) Investigate further (open the site, look at logs)
+いずれか失敗の場合：エビデンス（スクリーンショットパス、コンソールエラー、perf数値）を表示する。AskUserQuestionを使用する：
+- **コンテキスト：** デプロイ後のカナリーが本番サイトで問題を検出した。
+- **推奨：** 深刻度に応じて選択 — 重大（サイトダウン）ならB、軽微（コンソールエラー）ならA。
+- A) 想定内（デプロイ進行中、キャッシュクリア中） — 正常とマーク
+- B) 壊れている — リバートコミットを作成
+- C) さらに調査（サイトを開いてログを確認）
 
 ---
 
-## Step 8: Revert (if needed)
+## ステップ8：リバート（必要な場合）
 
-If the user chose to revert at any point:
+ユーザーがいずれかの時点でリバートを選択した場合：
 
 ```bash
 git fetch origin <base>
@@ -837,23 +811,23 @@ git revert <merge-commit-sha> --no-edit
 git push origin <base>
 ```
 
-If the revert has conflicts: warn "Revert has conflicts — manual resolution needed. The merge commit SHA is `<sha>`. You can run `git revert <sha>` manually."
+リバートにコンフリクトがある場合：「リバートにコンフリクトがあります — 手動での解決が必要です。マージコミットSHAは`<sha>`です。`git revert <sha>`を手動で実行できます。」と警告する。
 
-If the base branch has push protections: warn "Branch protections may prevent direct push — create a revert PR instead: `gh pr create --title 'revert: <original PR title>'`"
+ベースブランチにプッシュ保護がある場合：「ブランチ保護によって直接プッシュが阻止される可能性があります — 代わりにリバートPRを作成してください：`gh pr create --title 'revert: <元のPRタイトル>'`」と警告する。
 
-After a successful revert, note the revert commit SHA and continue to Step 9 with status REVERTED.
+リバートが成功した後、リバートコミットSHAを記録し、ステータスREVERTEDでステップ9に進む。
 
 ---
 
-## Step 9: Deploy report
+## ステップ9：デプロイレポート
 
-Create the deploy report directory:
+デプロイレポートディレクトリを作成する：
 
 ```bash
 mkdir -p .gstack/deploy-reports
 ```
 
-Produce and display the ASCII summary:
+ASCIIサマリーを作成して表示する：
 
 ```
 LAND & DEPLOY REPORT
@@ -874,46 +848,46 @@ CI:           <PASSED / SKIPPED>
 Deploy:       <PASSED / FAILED / NO WORKFLOW>
 Verification: <HEALTHY / DEGRADED / SKIPPED / REVERTED>
   Scope:      <FRONTEND / BACKEND / CONFIG / DOCS / MIXED>
-  Console:    <N errors or "clean">
+  Console:    <Nエラー or "clean">
   Load time:  <Xs>
   Screenshot: <path or "none">
 
-VERDICT: <DEPLOYED AND VERIFIED / DEPLOYED (UNVERIFIED) / REVERTED>
+VERDICT: <デプロイ済み・検証済み / デプロイ済み（未検証） / リバート済み>
 ```
 
-Save report to `.gstack/deploy-reports/{date}-pr{number}-deploy.md`.
+レポートを`.gstack/deploy-reports/{date}-pr{number}-deploy.md`に保存する。
 
-Log to the review dashboard:
+レビューダッシュボードに記録する：
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
 mkdir -p ~/.gstack/projects/$SLUG
 ```
 
-Write a JSONL entry with timing data:
+タイミングデータ付きのJSONLエントリを書き込む：
 ```json
 {"skill":"land-and-deploy","timestamp":"<ISO>","status":"<SUCCESS/REVERTED>","pr":<number>,"merge_sha":"<sha>","deploy_status":"<HEALTHY/DEGRADED/SKIPPED>","ci_wait_s":<N>,"queue_s":<N>,"deploy_s":<N>,"canary_s":<N>,"total_s":<N>}
 ```
 
 ---
 
-## Step 10: Suggest follow-ups
+## ステップ10：フォローアップの提案
 
-After the deploy report, suggest relevant follow-ups:
+デプロイレポートの後、関連するフォローアップを提案する：
 
-- If a production URL was verified: "Run `/canary <url> --duration 10m` for extended monitoring."
-- If performance data was collected: "Run `/benchmark <url>` for a deep performance audit."
-- "Run `/document-release` to update project documentation."
+- 本番URLが検証された場合：「`/canary <url> --duration 10m`を実行して拡張監視を行います。」
+- パフォーマンスデータが収集された場合：「`/benchmark <url>`を実行して詳細なパフォーマンス監査を行います。」
+- 「`/document-release`を実行してプロジェクトドキュメントを更新します。」
 
 ---
 
-## Important Rules
+## 重要なルール
 
-- **Never force push.** Use `gh pr merge` which is safe.
-- **Never skip CI.** If checks are failing, stop.
-- **Auto-detect everything.** PR number, merge method, deploy strategy, project type. Only ask when information genuinely can't be inferred.
-- **Poll with backoff.** Don't hammer GitHub API. 30-second intervals for CI/deploy, with reasonable timeouts.
-- **Revert is always an option.** At every failure point, offer revert as an escape hatch.
-- **Single-pass verification, not continuous monitoring.** `/land-and-deploy` checks once. `/canary` does the extended monitoring loop.
-- **Clean up.** Delete the feature branch after merge (via `--delete-branch`).
-- **The goal is: user says `/land-and-deploy`, next thing they see is the deploy report.**
+- **強制プッシュしない。** 安全な`gh pr merge`を使用する。
+- **CIをスキップしない。** チェックが失敗している場合、停止する。
+- **すべてを自動検出する。** PR番号、マージ方法、デプロイ戦略、プロジェクトタイプ。情報が本当に推測できない場合のみ質問する。
+- **バックオフ付きポーリング。** GitHub APIを叩きすぎない。CI/デプロイには30秒間隔、合理的なタイムアウト付き。
+- **リバートは常に選択肢。** すべての失敗ポイントで、リバートをエスケープハッチとして提供する。
+- **単一パス検証、継続監視ではない。** `/land-and-deploy`は一度チェックする。`/canary`が拡張監視ループを行う。
+- **クリーンアップする。** マージ後にフィーチャーブランチを削除する（`--delete-branch`経由）。
+- **目標：ユーザーが`/land-and-deploy`と言って、次に見るものがデプロイレポート。**

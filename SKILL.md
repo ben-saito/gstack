@@ -16,7 +16,7 @@ allowed-tools:
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 <!-- Regenerate: bun run gen:skill-docs -->
 
-## Preamble (run first)
+## プリアンブル（最初に実行）
 
 ```bash
 _UPD=$(~/.claude/skills/gstack/bin/gstack-update-check 2>/dev/null || .claude/skills/gstack/bin/gstack-update-check 2>/dev/null || true)
@@ -47,137 +47,140 @@ echo '{"skill":"gstack","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","repo":"'$(basen
 for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do [ -f "$_PF" ] && ~/.claude/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true; break; done
 ```
 
-If `PROACTIVE` is `"false"`, do not proactively suggest gstack skills — only invoke
-them when the user explicitly asks. The user opted out of proactive suggestions.
+## 言語（Language）
 
-If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.claude/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
+**すべてのユーザー向け応答・出力・質問を日本語で行うこと。**
+技術用語、コマンド名、コード、ファイルパス、エラーメッセージはそのまま英語を使用。
+AskUserQuestionの内容もすべて日本語で記述すること。
 
-If `LAKE_INTRO` is `no`: Before continuing, introduce the Completeness Principle.
-Tell the user: "gstack follows the **Boil the Lake** principle — always do the complete
-thing when AI makes the marginal cost near-zero. Read more: https://garryslist.org/posts/boil-the-ocean"
-Then offer to open the essay in their default browser:
+`PROACTIVE` が `"false"` の場合、gstackスキルを積極的に提案しないでください — ユーザーが明示的に要求した場合のみ呼び出してください。ユーザーは積極的な提案をオプトアウトしています。
+
+出力に `UPGRADE_AVAILABLE <old> <new>` が表示された場合：`~/.claude/skills/gstack/gstack-upgrade/SKILL.md` を読み取り、「インラインアップグレードフロー」に従ってください（設定されている場合は自動アップグレード、それ以外はAskUserQuestionで4つの選択肢を表示、拒否された場合はスヌーズ状態を書き込み）。`JUST_UPGRADED <from> <to>` の場合：ユーザーに「gstack v{to} を実行中（アップデート済み！）」と伝えて続行してください。
+
+`LAKE_INTRO` が `no` の場合：先に完全性の原則を紹介してください。
+ユーザーに伝えること：「gstackは**湖を沸かせ（Boil the Lake）**の原則に従います — AIが限界コストをほぼゼロにする今、常に完全なものを作りましょう。詳しくはこちら：https://garryslist.org/posts/boil-the-ocean」
+ブラウザでエッセイを開くか提案してください：
 
 ```bash
 open https://garryslist.org/posts/boil-the-ocean
 touch ~/.gstack/.completeness-intro-seen
 ```
 
-Only run `open` if the user says yes. Always run `touch` to mark as seen. This only happens once.
+`open` はユーザーが同意した場合のみ実行してください。`touch` は常に実行して表示済みとマークしてください。これは一度だけ発生します。
 
-If `TEL_PROMPTED` is `no` AND `LAKE_INTRO` is `yes`: After the lake intro is handled,
-ask the user about telemetry. Use AskUserQuestion:
+`TEL_PROMPTED` が `no` かつ `LAKE_INTRO` が `yes` の場合：湖の紹介が完了した後、ユーザーにテレメトリについて確認してください。AskUserQuestionを使用してください：
 
-> Help gstack get better! Community mode shares usage data (which skills you use, how long
-> they take, crash info) with a stable device ID so we can track trends and fix bugs faster.
-> No code, file paths, or repo names are ever sent.
-> Change anytime with `gstack-config set telemetry off`.
+> gstackの改善にご協力ください！コミュニティモードでは使用データ（使用スキル、所要時間、クラッシュ情報）を
+> 安定したデバイスIDと共に共有し、トレンドの追跡やバグ修正に役立てます。
+> コード、ファイルパス、リポジトリ名は一切送信されません。
+> `gstack-config set telemetry off`でいつでも変更可能です。
 
-Options:
-- A) Help gstack get better! (recommended)
-- B) No thanks
+選択肢：
+- A) gstackの改善に協力する（推奨）
+- B) いいえ、結構です
 
-If A: run `~/.claude/skills/gstack/bin/gstack-config set telemetry community`
+Aの場合：`~/.claude/skills/gstack/bin/gstack-config set telemetry community` を実行
 
-If B: ask a follow-up AskUserQuestion:
+Bの場合：フォローアップのAskUserQuestionを表示：
 
-> How about anonymous mode? We just learn that *someone* used gstack — no unique ID,
-> no way to connect sessions. Just a counter that helps us know if anyone's out there.
+> 匿名モードはいかがですか？gstackが*誰かに*使われたことだけを記録します — 固有IDなし、
+> セッションの紐付けなし。誰かがいることを知るためのカウンターです。
 
-Options:
-- A) Sure, anonymous is fine
-- B) No thanks, fully off
+選択肢：
+- A) はい、匿名なら大丈夫です
+- B) いいえ、完全にオフにしてください
 
-If B→A: run `~/.claude/skills/gstack/bin/gstack-config set telemetry anonymous`
-If B→B: run `~/.claude/skills/gstack/bin/gstack-config set telemetry off`
+B→Aの場合：`~/.claude/skills/gstack/bin/gstack-config set telemetry anonymous` を実行
+B→Bの場合：`~/.claude/skills/gstack/bin/gstack-config set telemetry off` を実行
 
-Always run:
+常に実行：
 ```bash
 touch ~/.gstack/.telemetry-prompted
 ```
 
-This only happens once. If `TEL_PROMPTED` is `yes`, skip this entirely.
+これは一度だけ発生します。`TEL_PROMPTED` が `yes` の場合、これを完全にスキップしてください。
 
-## AskUserQuestion Format
+## AskUserQuestion 形式
 
-**ALWAYS follow this structure for every AskUserQuestion call:**
-1. **Re-ground:** State the project, the current branch (use the `_BRANCH` value printed by the preamble — NOT any branch from conversation history or gitStatus), and the current plan/task. (1-2 sentences)
-2. **Simplify:** Explain the problem in plain English a smart 16-year-old could follow. No raw function names, no internal jargon, no implementation details. Use concrete examples and analogies. Say what it DOES, not what it's called.
-3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — always prefer the complete option over shortcuts (see Completeness Principle). Include `Completeness: X/10` for each option. Calibration: 10 = complete implementation (all edge cases, full coverage), 7 = covers happy path but skips some edges, 3 = shortcut that defers significant work. If both options are 8+, pick the higher; if one is ≤5, flag it.
-4. **Options:** Lettered options: `A) ... B) ... C) ...` — when an option involves effort, show both scales: `(human: ~X / CC: ~Y)`
-5. **One decision per question:** NEVER combine multiple independent decisions into a single AskUserQuestion. Each decision gets its own call with its own recommendation and focused options. Batching multiple AskUserQuestion calls in rapid succession is fine and often preferred. Only after all individual taste decisions are resolved should a final "Approve / Revise / Reject" gate be presented.
+**すべてのAskUserQuestion呼び出しで以下の構造に従うこと：**
+1. **状況確認:** プロジェクト、現在のブランチ（プリアンブルで出力された`_BRANCH`値を使用 — 会話履歴やgitStatusのブランチではない）、現在のプラン/タスクを述べる。（1-2文）
+2. **簡潔に:** 賢い16歳でも理解できる平易な日本語で問題を説明する。生の関数名、内部用語、実装詳細は使わない。具体例と例え話を使う。名前ではなく、何をするかを説明する。
+3. **推奨:** `推奨: [X]を選択。理由: [一行の理由]` — 常にショートカットよりも完全なオプションを推奨する（完全性の原則を参照）。各オプションに `完全性: X/10` を含める。基準：10 = 完全な実装（すべてのエッジケース、完全なカバレッジ）、7 = ハッピーパスはカバーするが一部のエッジをスキップ、3 = 重要な作業を先送りするショートカット。両方のオプションが8以上の場合、高い方を選ぶ。一方が5以下の場合、フラグを立てる。
+4. **選択肢:** 文字付き選択肢：`A) ... B) ... C) ...` — 選択肢が作業を伴う場合、両方のスケールを表示：`(人間: ~X / CC: ~Y)`
+5. **1つの質問に1つの決定:** 複数の独立した決定を1つのAskUserQuestionにまとめないでください。各決定には独自の呼び出しと推奨と集中した選択肢を設けてください。複数のAskUserQuestionを連続して呼び出すことは問題ありません。すべての個別の判断が解決された後にのみ、最終的な「承認 / 修正 / 却下」ゲートを提示してください。
 
-Assume the user hasn't looked at this window in 20 minutes and doesn't have the code open. If you'd need to read the source to understand your own explanation, it's too complex.
+ユーザーは20分間このウィンドウを見ておらず、コードも開いていないと仮定すること。自分の説明を理解するためにソースを読む必要があるなら、複雑すぎる。
 
-Per-skill instructions may add additional formatting rules on top of this baseline.
+スキルごとの指示で、このベースラインに追加のフォーマットルールが加わる場合があります。
 
-## Completeness Principle — Boil the Lake
+## 完全性の原則 — 湖を沸かせ（Boil the Lake）
 
-AI-assisted coding makes the marginal cost of completeness near-zero. When you present options:
+AI支援コーディングにより、完全性の限界コストはほぼゼロになります。選択肢を提示する際：
 
-- If Option A is the complete implementation (full parity, all edge cases, 100% coverage) and Option B is a shortcut that saves modest effort — **always recommend A**. The delta between 80 lines and 150 lines is meaningless with CC+gstack. "Good enough" is the wrong instinct when "complete" costs minutes more.
-- **Lake vs. ocean:** A "lake" is boilable — 100% test coverage for a module, full feature implementation, handling all edge cases, complete error paths. An "ocean" is not — rewriting an entire system from scratch, adding features to dependencies you don't control, multi-quarter platform migrations. Recommend boiling lakes. Flag oceans as out of scope.
-- **When estimating effort**, always show both scales: human team time and CC+gstack time. The compression ratio varies by task type — use this reference:
+- オプションAが完全な実装（完全な同等性、すべてのエッジケース、100%カバレッジ）で、オプションBがわずかな工数を節約するショートカットの場合 — **常にAを推奨してください。** CC+gstackでは80行と150行の差は意味がありません。「十分」は、「完全」にあと数分しかかからない時には間違った判断です。
+- **湖 vs. 海：** 「湖」は沸かせられます — モジュールの100%テストカバレッジ、完全な機能実装、すべてのエッジケースの処理、完全なエラーパス。「海」は沸かせられません — システム全体のゼロからの書き直し、制御できない依存関係への機能追加、複数四半期にわたるプラットフォーム移行。湖を沸かすことを推奨してください。海はスコープ外とフラグを立ててください。
+- **工数の見積もり時**には、常に両方のスケールを表示してください：人間チームの時間とCC+gstackの時間。圧縮率はタスクタイプによって異なります — 以下の参照を使用してください：
 
-| Task type | Human team | CC+gstack | Compression |
+| タスクタイプ | 人間チーム | CC+gstack | 圧縮率 |
 |-----------|-----------|-----------|-------------|
-| Boilerplate / scaffolding | 2 days | 15 min | ~100x |
-| Test writing | 1 day | 15 min | ~50x |
-| Feature implementation | 1 week | 30 min | ~30x |
-| Bug fix + regression test | 4 hours | 15 min | ~20x |
-| Architecture / design | 2 days | 4 hours | ~5x |
-| Research / exploration | 1 day | 3 hours | ~3x |
+| ボイラープレート / スキャフォールディング | 2日 | 15分 | ~100倍 |
+| テスト作成 | 1日 | 15分 | ~50倍 |
+| 機能実装 | 1週間 | 30分 | ~30倍 |
+| バグ修正 + 回帰テスト | 4時間 | 15分 | ~20倍 |
+| アーキテクチャ / 設計 | 2日 | 4時間 | ~5倍 |
+| リサーチ / 調査 | 1日 | 3時間 | ~3倍 |
 
-- This principle applies to test coverage, error handling, documentation, edge cases, and feature completeness. Don't skip the last 10% to "save time" — with AI, that 10% costs seconds.
+- この原則は、テストカバレッジ、エラー処理、ドキュメント、エッジケース、機能の完全性に適用されます。「時間を節約する」ために最後の10%をスキップしないでください — AIを使えば、その10%は数秒しかかかりません。
 
-**Anti-patterns — DON'T do this:**
-- BAD: "Choose B — it covers 90% of the value with less code." (If A is only 70 lines more, choose A.)
-- BAD: "We can skip edge case handling to save time." (Edge case handling costs minutes with CC.)
-- BAD: "Let's defer test coverage to a follow-up PR." (Tests are the cheapest lake to boil.)
-- BAD: Quoting only human-team effort: "This would take 2 weeks." (Say: "2 weeks human / ~1 hour CC.")
+**アンチパターン — やってはいけないこと：**
+- 悪い例：「Bを選びましょう — コードが少なくて価値の90%をカバーします。」（Aがたった70行多いだけなら、Aを選ぶ。）
+- 悪い例：「時間を節約するためにエッジケース処理をスキップしましょう。」（CCならエッジケース処理は数分です。）
+- 悪い例：「テストカバレッジはフォローアップPRに延期しましょう。」（テストは最も安く沸かせられる湖です。）
+- 悪い例：人間チームの工数だけを引用する：「これは2週間かかります。」（「人間なら2週間 / CCなら~1時間」と言う。）
 
-## Repo Ownership Mode — See Something, Say Something
+## リポジトリ所有モード — 気づいたら声を上げる
 
-`REPO_MODE` from the preamble tells you who owns issues in this repo:
+プリアンブルの `REPO_MODE` は、このリポジトリで誰がイシューを担当するかを示します：
 
-- **`solo`** — One person does 80%+ of the work. They own everything. When you notice issues outside the current branch's changes (test failures, deprecation warnings, security advisories, linting errors, dead code, env problems), **investigate and offer to fix proactively**. The solo dev is the only person who will fix it. Default to action.
-- **`collaborative`** — Multiple active contributors. When you notice issues outside the branch's changes, **flag them via AskUserQuestion** — it may be someone else's responsibility. Default to asking, not fixing.
-- **`unknown`** — Treat as collaborative (safer default — ask before fixing).
+- **`solo`** — 1人が作業の80%以上を行う。すべてを担当。現在のブランチの変更外でイシューに気づいた場合（テスト失敗、非推奨警告、セキュリティアドバイザリ、リンティングエラー、デッドコード、環境問題）、**積極的に調査して修正を提案してください。** ソロ開発者はそれを修正する唯一の人です。行動をデフォルトとしてください。
+- **`collaborative`** — 複数のアクティブなコントリビューター。ブランチの変更外でイシューに気づいた場合、**AskUserQuestionでフラグを立ててください** — 他の人の責任かもしれません。修正ではなく、確認をデフォルトとしてください。
+- **`unknown`** — collaborativeとして扱う（より安全なデフォルト — 修正前に確認）。
 
-**See Something, Say Something:** Whenever you notice something that looks wrong during ANY workflow step — not just test failures — flag it briefly. One sentence: what you noticed and its impact. In solo mode, follow up with "Want me to fix it?" In collaborative mode, just flag it and move on.
+**気づいたら声を上げる：** ワークフローのどのステップでも、何かおかしいと気づいたら — テスト失敗だけでなく — 簡潔にフラグを立ててください。一文で：気づいたことと影響。soloモードでは「修正しましょうか？」とフォローアップ。collaborativeモードではフラグを立てて先に進みます。
 
-Never let a noticed issue silently pass. The whole point is proactive communication.
+気づいたイシューを黙って見過ごさないでください。ポイントは積極的なコミュニケーションです。
 
-## Search Before Building
+## 作る前に探せ（Search Before Building）
 
-Before building infrastructure, unfamiliar patterns, or anything the runtime might have a built-in — **search first.** Read `~/.claude/skills/gstack/ETHOS.md` for the full philosophy.
+インフラ、馴染みのないパターン、またはランタイムにビルトインがありそうなものを構築する前に — **まず検索してください。** 完全な哲学については `~/.claude/skills/gstack/ETHOS.md` を参照してください。
 
-**Three layers of knowledge:**
-- **Layer 1** (tried and true — in distribution). Don't reinvent the wheel. But the cost of checking is near-zero, and once in a while, questioning the tried-and-true is where brilliance occurs.
-- **Layer 2** (new and popular — search for these). But scrutinize: humans are subject to mania. Search results are inputs to your thinking, not answers.
-- **Layer 3** (first principles — prize these above all). Original observations derived from reasoning about the specific problem. The most valuable of all.
+**知識の3層：**
+- **レイヤー1**（実績あり — ディストリビューション内）。車輪の再発明をしない。ただし、確認のコストはほぼゼロで、稀に実績ある方法を疑うことが素晴らしい発見につながる。
+- **レイヤー2**（新しくて人気 — これらを検索する）。ただし精査すること：人間はマニアに陥りやすい。検索結果は思考への入力であり、答えではない。
+- **レイヤー3**（第一原理 — これを何より重視する）。特定の問題についての推論から導き出されたオリジナルの観察。最も価値がある。
 
-**Eureka moment:** When first-principles reasoning reveals conventional wisdom is wrong, name it:
-"EUREKA: Everyone does X because [assumption]. But [evidence] shows this is wrong. Y is better because [reasoning]."
+**ユーレカモーメント：** 第一原理の推論により従来の常識が間違っていることが判明した場合、名前を付ける：
+「EUREKA: 皆が[仮定]のためにXをしている。しかし[証拠]がこれが間違いであることを示している。Yの方が優れている。理由：[推論]。」
 
-Log eureka moments:
+ユーレカモーメントを記録する：
 ```bash
 jq -n --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg skill "SKILL_NAME" --arg branch "$(git branch --show-current 2>/dev/null)" --arg insight "ONE_LINE_SUMMARY" '{ts:$ts,skill:$skill,branch:$branch,insight:$insight}' >> ~/.gstack/analytics/eureka.jsonl 2>/dev/null || true
 ```
-Replace SKILL_NAME and ONE_LINE_SUMMARY. Runs inline — don't stop the workflow.
+SKILL_NAMEとONE_LINE_SUMMARYを置き換えてください。インラインで実行 — ワークフローを停止しないでください。
 
-**WebSearch fallback:** If WebSearch is unavailable, skip the search step and note: "Search unavailable — proceeding with in-distribution knowledge only."
+**WebSearchフォールバック：** WebSearchが利用できない場合、検索ステップをスキップして注記してください：「検索が利用できません — ディストリビューション内の知識のみで進めます。」
 
-## Contributor Mode
+## コントリビューターモード
 
-If `_CONTRIB` is `true`: you are in **contributor mode**. You're a gstack user who also helps make it better.
+`_CONTRIB` が `true` の場合：**コントリビューターモード**です。あなたはgstackのユーザーであると同時に、改善にも協力しています。
 
-**At the end of each major workflow step** (not after every single command), reflect on the gstack tooling you used. Rate your experience 0 to 10. If it wasn't a 10, think about why. If there is an obvious, actionable bug OR an insightful, interesting thing that could have been done better by gstack code or skill markdown — file a field report. Maybe our contributor will help make us better!
+**各主要ワークフローステップの終了時**（すべてのコマンド後ではなく）、使用したgstackツールについて振り返ってください。体験を0〜10で評価してください。10でなかった場合、その理由を考えてください。明らかで実行可能なバグ、またはgstackのコードやスキルmarkdownで改善できた洞察に富む興味深い点があれば — フィールドレポートを提出してください。コントリビューターが改善に役立てるかもしれません！
 
-**Calibration — this is the bar:** For example, `$B js "await fetch(...)"` used to fail with `SyntaxError: await is only valid in async functions` because gstack didn't wrap expressions in async context. Small, but the input was reasonable and gstack should have handled it — that's the kind of thing worth filing. Things less consequential than this, ignore.
+**基準 — これがバーです：** 例えば、`$B js "await fetch(...)"` は以前、gstackが式をasyncコンテキストでラップしなかったため `SyntaxError: await is only valid in async functions` で失敗していました。小さいことですが、入力は妥当でありgstackが処理すべきでした — これが報告に値する種類のことです。これより些細なことは無視してください。
 
-**NOT worth filing:** user's app bugs, network errors to user's URL, auth failures on user's site, user's own JS logic bugs.
+**報告に値しないもの：** ユーザーのアプリのバグ、ユーザーのURLへのネットワークエラー、ユーザーのサイトでの認証失敗、ユーザー自身のJSロジックのバグ。
 
-**To file:** write `~/.gstack/contributor-logs/{slug}.md` with **all sections below** (do not truncate — include every section through the Date/Version footer):
+**提出方法：** `~/.gstack/contributor-logs/{slug}.md` に以下の**すべてのセクション**を含めて書き込みます（省略しない — Date/Versionフッターまですべてのセクションを含める）：
 
 ```
 # {Title}
@@ -202,46 +205,42 @@ Hey gstack team — ran into this while using /{skill-name}:
 **Date:** {YYYY-MM-DD} | **Version:** {gstack version} | **Skill:** /{skill}
 ```
 
-Slug: lowercase, hyphens, max 60 chars (e.g. `browse-js-no-await`). Skip if file already exists. Max 3 reports per session. File inline and continue — don't stop the workflow. Tell user: "Filed gstack field report: {title}"
+スラッグ：小文字、ハイフン、最大60文字（例：`browse-js-no-await`）。ファイルが既に存在する場合はスキップ。セッションあたり最大3件。インラインで提出して続行 — ワークフローを停止しないでください。ユーザーに伝えます：「gstackフィールドレポートを提出しました：{title}」
 
-## Completion Status Protocol
+## 完了ステータスプロトコル
 
-When completing a skill workflow, report status using one of:
-- **DONE** — All steps completed successfully. Evidence provided for each claim.
-- **DONE_WITH_CONCERNS** — Completed, but with issues the user should know about. List each concern.
-- **BLOCKED** — Cannot proceed. State what is blocking and what was tried.
-- **NEEDS_CONTEXT** — Missing information required to continue. State exactly what you need.
+スキルワークフローを完了する際、以下のいずれかでステータスを報告します：
+- **DONE** — すべてのステップが正常に完了。各主張にエビデンスを提供。
+- **DONE_WITH_CONCERNS** — 完了したが、ユーザーが知るべき問題あり。各懸念を列挙。
+- **BLOCKED** — 続行不可。ブロッカーと試行した内容を記述。
+- **NEEDS_CONTEXT** — 続行に必要な情報が不足。必要な情報を正確に記述。
 
-### Escalation
+### エスカレーション
 
-It is always OK to stop and say "this is too hard for me" or "I'm not confident in this result."
+「これは自分には難しすぎる」または「この結果に自信がない」と言って停止することは常に許可されています。
 
-Bad work is worse than no work. You will not be penalized for escalating.
-- If you have attempted a task 3 times without success, STOP and escalate.
-- If you are uncertain about a security-sensitive change, STOP and escalate.
-- If the scope of work exceeds what you can verify, STOP and escalate.
+悪い作業は作業なしより悪い。エスカレーションしてもペナルティはありません。
+- タスクを3回試行しても成功しない場合、停止してエスカレーションしてください。
+- セキュリティに関わる変更に確信が持てない場合、停止してエスカレーションしてください。
+- 作業の範囲が検証できる範囲を超える場合、停止してエスカレーションしてください。
 
-Escalation format:
+エスカレーション形式：
 ```
 STATUS: BLOCKED | NEEDS_CONTEXT
-REASON: [1-2 sentences]
-ATTEMPTED: [what you tried]
-RECOMMENDATION: [what the user should do next]
+REASON: [1-2文]
+ATTEMPTED: [試行した内容]
+RECOMMENDATION: [ユーザーが次にすべきこと]
 ```
 
-## Telemetry (run last)
+## テレメトリ（最後に実行）
 
-After the skill workflow completes (success, error, or abort), log the telemetry event.
-Determine the skill name from the `name:` field in this file's YAML frontmatter.
-Determine the outcome from the workflow result (success if completed normally, error
-if it failed, abort if the user interrupted).
+スキルワークフロー完了後（成功、エラー、中断のいずれか）、テレメトリイベントを記録します。
+このファイルのYAMLフロントマターの `name:` フィールドからスキル名を決定します。
+ワークフロー結果から結果を決定します（正常完了ならsuccess、失敗ならerror、ユーザーが中断したならabort）。
 
-**PLAN MODE EXCEPTION — ALWAYS RUN:** This command writes telemetry to
-`~/.gstack/analytics/` (user config directory, not project files). The skill
-preamble already writes to the same directory — this is the same pattern.
-Skipping this command loses session duration and outcome data.
+**プランモード例外 — 常に実行：** このコマンドは `~/.gstack/analytics/` にテレメトリを書き込みます（プロジェクトファイルではなくユーザー設定ディレクトリ）。スキルプリアンブルは既に同じディレクトリに書き込んでいます — これは同じパターンです。このコマンドをスキップすると、セッション時間と結果データが失われます。
 
-Run this bash:
+以下のbashを実行します：
 
 ```bash
 _TEL_END=$(date +%s)
@@ -252,29 +251,24 @@ rm -f ~/.gstack/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
   --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
 ```
 
-Replace `SKILL_NAME` with the actual skill name from frontmatter, `OUTCOME` with
-success/error/abort, and `USED_BROWSE` with true/false based on whether `$B` was used.
-If you cannot determine the outcome, use "unknown". This runs in the background and
-never blocks the user.
+`SKILL_NAME` をフロントマターの実際のスキル名に、`OUTCOME` をsuccess/error/abortに、`USED_BROWSE` を `$B` が使用されたかどうかに基づいてtrue/falseに置き換えてください。結果を判断できない場合は "unknown" を使用してください。これはバックグラウンドで実行され、ユーザーをブロックしません。
 
-## Plan Status Footer
+## プランステータスフッター
 
-When you are in plan mode and about to call ExitPlanMode:
+プランモードでExitPlanModeを呼び出す前に：
 
-1. Check if the plan file already has a `## GSTACK REVIEW REPORT` section.
-2. If it DOES — skip (a review skill already wrote a richer report).
-3. If it does NOT — run this command:
+1. プランファイルに既に `## GSTACK REVIEW REPORT` セクションがあるか確認します。
+2. ある場合 — スキップしてください（レビュースキルが既にリッチなレポートを書いています）。
+3. ない場合 — 以下のコマンドを実行します：
 
 \`\`\`bash
 ~/.claude/skills/gstack/bin/gstack-review-read
 \`\`\`
 
-Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
+その後、プランファイルの末尾に `## GSTACK REVIEW REPORT` セクションを書き込みます：
 
-- If the output contains review entries (JSONL lines before `---CONFIG---`): format the
-  standard report table with runs/status/findings per skill, same format as the review
-  skills use.
-- If the output is `NO_REVIEWS` or empty: write this placeholder table:
+- 出力にレビューエントリ（`---CONFIG---` の前のJSONL行）が含まれる場合：レビュースキルが使用するのと同じ形式で、スキルごとの実行回数/ステータス/findings を含む標準レポートテーブルをフォーマットします。
+- 出力が `NO_REVIEWS` または空の場合：以下のプレースホルダーテーブルを書き込みます：
 
 \`\`\`markdown
 ## GSTACK REVIEW REPORT
@@ -289,20 +283,16 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 **VERDICT:** NO REVIEWS YET — run \`/autoplan\` for full review pipeline, or individual reviews above.
 \`\`\`
 
-**PLAN MODE EXCEPTION — ALWAYS RUN:** This writes to the plan file, which is the one
-file you are allowed to edit in plan mode. The plan file review report is part of the
-plan's living status.
+**プランモード例外 — 常に実行：** これはプランファイルに書き込みます。プランモードで編集が許可されている唯一のファイルです。プランファイルのレビューレポートはプランのリアルタイムステータスの一部です。
 
-If `PROACTIVE` is `false`: do NOT proactively suggest other gstack skills during this session.
-Only run skills the user explicitly invokes. This preference persists across sessions via
-`gstack-config`.
+`PROACTIVE` が `false` の場合：このセッション中に他のgstackスキルを積極的に提案しないでください。ユーザーが明示的に呼び出したスキルのみ実行してください。この設定は `gstack-config` を通じてセッション間で維持されます。
 
-# gstack browse: QA Testing & Dogfooding
+# gstack browse: QAテスト & ドッグフーディング
 
-Persistent headless Chromium. First call auto-starts (~3s), then ~100-200ms per command.
-Auto-shuts down after 30 min idle. State persists between calls (cookies, tabs, sessions).
+永続的なヘッドレスChromium。初回呼び出し時に自動起動（約3秒）、以降はコマンドごとに約100-200ms。
+30分間アイドル状態で自動シャットダウン。呼び出し間で状態が保持されます（Cookie、タブ、セッション）。
 
-## SETUP (run this check BEFORE any browse command)
+## セットアップ（browseコマンドの前に必ずこのチェックを実行）
 
 ```bash
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
@@ -316,105 +306,105 @@ else
 fi
 ```
 
-If `NEEDS_SETUP`:
-1. Tell the user: "gstack browse needs a one-time build (~10 seconds). OK to proceed?" Then STOP and wait.
-2. Run: `cd <SKILL_DIR> && ./setup`
-3. If `bun` is not installed: `curl -fsSL https://bun.sh/install | bash`
+`NEEDS_SETUP` の場合：
+1. ユーザーに伝えてください：「gstack browseには初回のみのビルドが必要です（約10秒）。続行してよろしいですか？」その後、停止して待機してください。
+2. 実行：`cd <SKILL_DIR> && ./setup`
+3. `bun` がインストールされていない場合：`curl -fsSL https://bun.sh/install | bash`
 
-## IMPORTANT
+## 重要事項
 
-- Use the compiled binary via Bash: `$B <command>`
-- NEVER use `mcp__claude-in-chrome__*` tools. They are slow and unreliable.
-- Browser persists between calls — cookies, login sessions, and tabs carry over.
-- Dialogs (alert/confirm/prompt) are auto-accepted by default — no browser lockup.
-- **Show screenshots:** After `$B screenshot`, `$B snapshot -a -o`, or `$B responsive`, always use the Read tool on the output PNG(s) so the user can see them. Without this, screenshots are invisible.
+- コンパイル済みバイナリをBash経由で使用：`$B <command>`
+- `mcp__claude-in-chrome__*` ツールは**絶対に使用しないでください**。遅くて信頼性が低いです。
+- ブラウザは呼び出し間で保持されます — Cookie、ログインセッション、タブは引き継がれます。
+- ダイアログ（alert/confirm/prompt）はデフォルトで自動承認されます — ブラウザのロックアップはありません。
+- **スクリーンショットを表示：** `$B screenshot`、`$B snapshot -a -o`、または `$B responsive` の後は、常にReadツールで出力PNGを読み取り、ユーザーが確認できるようにしてください。これがないとスクリーンショットは見えません。
 
-## QA Workflows
+## QAワークフロー
 
-### Test a user flow (login, signup, checkout, etc.)
+### ユーザーフローのテスト（ログイン、サインアップ、チェックアウトなど）
 
 ```bash
-# 1. Go to the page
+# 1. ページに移動
 $B goto https://app.example.com/login
 
-# 2. See what's interactive
+# 2. インタラクティブな要素を確認
 $B snapshot -i
 
-# 3. Fill the form using refs
+# 3. refを使ってフォームを入力
 $B fill @e3 "test@example.com"
 $B fill @e4 "password123"
 $B click @e5
 
-# 4. Verify it worked
-$B snapshot -D              # diff shows what changed after clicking
-$B is visible ".dashboard"  # assert the dashboard appeared
+# 4. 成功したか確認
+$B snapshot -D              # diffでクリック後の変化を表示
+$B is visible ".dashboard"  # ダッシュボードが表示されたか確認
 $B screenshot /tmp/after-login.png
 ```
 
-### Verify a deployment / check prod
+### デプロイメントの確認 / 本番チェック
 
 ```bash
 $B goto https://yourapp.com
-$B text                          # read the page — does it load?
-$B console                       # any JS errors?
-$B network                       # any failed requests?
-$B js "document.title"           # correct title?
-$B is visible ".hero-section"    # key elements present?
+$B text                          # ページを読む — 読み込めるか？
+$B console                       # JSエラーはないか？
+$B network                       # 失敗したリクエストはないか？
+$B js "document.title"           # 正しいタイトルか？
+$B is visible ".hero-section"    # 主要な要素は存在するか？
 $B screenshot /tmp/prod-check.png
 ```
 
-### Dogfood a feature end-to-end
+### 機能のエンドツーエンドドッグフーディング
 
 ```bash
-# Navigate to the feature
+# 機能に移動
 $B goto https://app.example.com/new-feature
 
-# Take annotated screenshot — shows every interactive element with labels
+# アノテーション付きスクリーンショットを撮影 — すべてのインタラクティブ要素にラベルを表示
 $B snapshot -i -a -o /tmp/feature-annotated.png
 
-# Find ALL clickable things (including divs with cursor:pointer)
+# すべてのクリック可能な要素を検出（cursor:pointerのdivを含む）
 $B snapshot -C
 
-# Walk through the flow
-$B snapshot -i          # baseline
-$B click @e3            # interact
-$B snapshot -D          # what changed? (unified diff)
+# フローを進める
+$B snapshot -i          # ベースライン
+$B click @e3            # インタラクション
+$B snapshot -D          # 何が変わった？（unified diff）
 
-# Check element states
+# 要素の状態を確認
 $B is visible ".success-toast"
 $B is enabled "#next-step-btn"
 $B is checked "#agree-checkbox"
 
-# Check console for errors after interactions
+# インタラクション後にコンソールでエラーを確認
 $B console
 ```
 
-### Test responsive layouts
+### レスポンシブレイアウトのテスト
 
 ```bash
-# Quick: 3 screenshots at mobile/tablet/desktop
+# クイック：モバイル/タブレット/デスクトップの3枚のスクリーンショット
 $B goto https://yourapp.com
 $B responsive /tmp/layout
 
-# Manual: specific viewport
+# 手動：特定のビューポート
 $B viewport 375x812     # iPhone
 $B screenshot /tmp/mobile.png
-$B viewport 1440x900    # Desktop
+$B viewport 1440x900    # デスクトップ
 $B screenshot /tmp/desktop.png
 
-# Element screenshot (crop to specific element)
+# 要素スクリーンショット（特定の要素にクロップ）
 $B screenshot "#hero-banner" /tmp/hero.png
 $B snapshot -i
 $B screenshot @e3 /tmp/button.png
 
-# Region crop
+# 領域クロップ
 $B screenshot --clip 0,0,800,600 /tmp/above-fold.png
 
-# Viewport only (no scroll)
+# ビューポートのみ（スクロールなし）
 $B screenshot --viewport /tmp/viewport.png
 ```
 
-### Test file upload
+### ファイルアップロードのテスト
 
 ```bash
 $B goto https://app.example.com/upload
@@ -424,59 +414,59 @@ $B is visible ".upload-success"
 $B screenshot /tmp/upload-result.png
 ```
 
-### Test forms with validation
+### バリデーション付きフォームのテスト
 
 ```bash
 $B goto https://app.example.com/form
 $B snapshot -i
 
-# Submit empty — check validation errors appear
-$B click @e10                        # submit button
-$B snapshot -D                       # diff shows error messages appeared
+# 空で送信 — バリデーションエラーが表示されるか確認
+$B click @e10                        # 送信ボタン
+$B snapshot -D                       # diffでエラーメッセージの出現を表示
 $B is visible ".error-message"
 
-# Fill and resubmit
+# 入力して再送信
 $B fill @e3 "valid input"
 $B click @e10
-$B snapshot -D                       # diff shows errors gone, success state
+$B snapshot -D                       # diffでエラー消去、成功状態を表示
 ```
 
-### Test dialogs (delete confirmations, prompts)
+### ダイアログのテスト（削除確認、プロンプト）
 
 ```bash
-# Set up dialog handling BEFORE triggering
-$B dialog-accept              # will auto-accept next alert/confirm
-$B click "#delete-button"     # triggers confirmation dialog
-$B dialog                     # see what dialog appeared
-$B snapshot -D                # verify the item was deleted
+# ダイアログのトリガー前にハンドリングを設定
+$B dialog-accept              # 次のalert/confirmを自動承認
+$B click "#delete-button"     # 確認ダイアログをトリガー
+$B dialog                     # どのダイアログが表示されたか確認
+$B snapshot -D                # アイテムが削除されたか確認
 
-# For prompts that need input
-$B dialog-accept "my answer"  # accept with text
-$B click "#rename-button"     # triggers prompt
+# 入力が必要なプロンプトの場合
+$B dialog-accept "my answer"  # テキスト付きで承認
+$B click "#rename-button"     # プロンプトをトリガー
 ```
 
-### Test authenticated pages (import real browser cookies)
+### 認証済みページのテスト（実際のブラウザCookieをインポート）
 
 ```bash
-# Import cookies from your real browser (opens interactive picker)
+# 実際のブラウザからCookieをインポート（インタラクティブピッカーを開く）
 $B cookie-import-browser
 
-# Or import a specific domain directly
+# 特定のドメインを直接インポート
 $B cookie-import-browser comet --domain .github.com
 
-# Now test authenticated pages
+# 認証済みページをテスト
 $B goto https://github.com/settings/profile
 $B snapshot -i
 $B screenshot /tmp/github-profile.png
 ```
 
-### Compare two pages / environments
+### 2つのページ/環境の比較
 
 ```bash
 $B diff https://staging.app.com https://prod.app.com
 ```
 
-### Multi-step chain (efficient for long flows)
+### マルチステップチェーン（長いフローに効率的）
 
 ```bash
 echo '[
@@ -490,173 +480,173 @@ echo '[
 ]' | $B chain
 ```
 
-## Quick Assertion Patterns
+## クイックアサーションパターン
 
 ```bash
-# Element exists and is visible
+# 要素が存在し表示されている
 $B is visible ".modal"
 
-# Button is enabled/disabled
+# ボタンが有効/無効
 $B is enabled "#submit-btn"
 $B is disabled "#submit-btn"
 
-# Checkbox state
+# チェックボックスの状態
 $B is checked "#agree"
 
-# Input is editable
+# 入力が編集可能
 $B is editable "#name-field"
 
-# Element has focus
+# 要素にフォーカスがある
 $B is focused "#search-input"
 
-# Page contains text
+# ページにテキストが含まれている
 $B js "document.body.textContent.includes('Success')"
 
-# Element count
+# 要素数
 $B js "document.querySelectorAll('.list-item').length"
 
-# Specific attribute value
-$B attrs "#logo"    # returns all attributes as JSON
+# 特定の属性値
+$B attrs "#logo"    # すべての属性をJSONとして返す
 
-# CSS property
+# CSSプロパティ
 $B css ".button" "background-color"
 ```
 
-## Snapshot System
+## スナップショットシステム
 
-The snapshot is your primary tool for understanding and interacting with pages.
+スナップショットは、ページの理解とインタラクションのための主要ツールです。
 
 ```
--i        --interactive           Interactive elements only (buttons, links, inputs) with @e refs
--c        --compact               Compact (no empty structural nodes)
--d <N>    --depth                 Limit tree depth (0 = root only, default: unlimited)
--s <sel>  --selector              Scope to CSS selector
--D        --diff                  Unified diff against previous snapshot (first call stores baseline)
--a        --annotate              Annotated screenshot with red overlay boxes and ref labels
--o <path> --output                Output path for annotated screenshot (default: <temp>/browse-annotated.png)
--C        --cursor-interactive    Cursor-interactive elements (@c refs — divs with pointer, onclick)
+-i        --interactive           インタラクティブ要素のみ（ボタン、リンク、入力）@eリファレンス付き
+-c        --compact               コンパクト（空の構造ノードなし）
+-d <N>    --depth                 ツリー深度の制限（0 = ルートのみ、デフォルト: 無制限）
+-s <sel>  --selector              CSSセレクターにスコープを限定
+-D        --diff                  前回のスナップショットとのunified diff（初回呼び出しでベースラインを保存）
+-a        --annotate              赤いオーバーレイボックスとrefラベル付きのアノテーションスクリーンショット
+-o <path> --output                アノテーションスクリーンショットの出力パス（デフォルト: <temp>/browse-annotated.png）
+-C        --cursor-interactive    カーソルインタラクティブ要素（@cリファレンス — pointerやonclickのdiv）
 ```
 
-All flags can be combined freely. `-o` only applies when `-a` is also used.
-Example: `$B snapshot -i -a -C -o /tmp/annotated.png`
+すべてのフラグは自由に組み合わせ可能です。`-o` は `-a` が同時に使用されている場合のみ適用されます。
+例：`$B snapshot -i -a -C -o /tmp/annotated.png`
 
-**Ref numbering:** @e refs are assigned sequentially (@e1, @e2, ...) in tree order.
-@c refs from `-C` are numbered separately (@c1, @c2, ...).
+**ref番号：** @eリファレンスはツリー順に連番で割り当てられます（@e1, @e2, ...）。
+`-C` からの@cリファレンスは別に番号が振られます（@c1, @c2, ...）。
 
-After snapshot, use @refs as selectors in any command:
+スナップショット後、@refをセレクターとして任意のコマンドで使用できます：
 ```bash
 $B click @e3       $B fill @e4 "value"     $B hover @e1
 $B html @e2        $B css @e5 "color"      $B attrs @e6
-$B click @c1       # cursor-interactive ref (from -C)
+$B click @c1       # カーソルインタラクティブref（-Cから）
 ```
 
-**Output format:** indented accessibility tree with @ref IDs, one element per line.
+**出力形式：** @ref ID付きのインデントされたアクセシビリティツリー、1行に1要素。
 ```
   @e1 [heading] "Welcome" [level=1]
   @e2 [textbox] "Email"
   @e3 [button] "Submit"
 ```
 
-Refs are invalidated on navigation — run `snapshot` again after `goto`.
+refはナビゲーション時に無効化されます — `goto` の後に `snapshot` を再実行してください。
 
-## Command Reference
+## コマンドリファレンス
 
-### Navigation
-| Command | Description |
+### ナビゲーション
+| コマンド | 説明 |
 |---------|-------------|
-| `back` | History back |
-| `forward` | History forward |
-| `goto <url>` | Navigate to URL |
-| `reload` | Reload page |
-| `url` | Print current URL |
+| `back` | 履歴を戻る |
+| `forward` | 履歴を進む |
+| `goto <url>` | URLに移動 |
+| `reload` | ページを再読み込み |
+| `url` | 現在のURLを表示 |
 
-### Reading
-| Command | Description |
+### 読み取り
+| コマンド | 説明 |
 |---------|-------------|
-| `accessibility` | Full ARIA tree |
-| `forms` | Form fields as JSON |
-| `html [selector]` | innerHTML of selector (throws if not found), or full page HTML if no selector given |
-| `links` | All links as "text → href" |
-| `text` | Cleaned page text |
+| `accessibility` | 完全なARIAツリー |
+| `forms` | フォームフィールドをJSONで表示 |
+| `html [selector]` | セレクターのinnerHTML（見つからない場合はエラー）、セレクターなしの場合はページ全体のHTML |
+| `links` | すべてのリンクを「テキスト → href」形式で表示 |
+| `text` | クリーンなページテキスト |
 
-### Interaction
-| Command | Description |
+### インタラクション
+| コマンド | 説明 |
 |---------|-------------|
-| `click <sel>` | Click element |
-| `cookie <name>=<value>` | Set cookie on current page domain |
-| `cookie-import <json>` | Import cookies from JSON file |
-| `cookie-import-browser [browser] [--domain d]` | Import cookies from installed Chromium browsers (opens picker, or use --domain for direct import) |
-| `dialog-accept [text]` | Auto-accept next alert/confirm/prompt. Optional text is sent as the prompt response |
-| `dialog-dismiss` | Auto-dismiss next dialog |
-| `fill <sel> <val>` | Fill input |
-| `header <name>:<value>` | Set custom request header (colon-separated, sensitive values auto-redacted) |
-| `hover <sel>` | Hover element |
-| `press <key>` | Press key — Enter, Tab, Escape, ArrowUp/Down/Left/Right, Backspace, Delete, Home, End, PageUp, PageDown, or modifiers like Shift+Enter |
-| `scroll [sel]` | Scroll element into view, or scroll to page bottom if no selector |
-| `select <sel> <val>` | Select dropdown option by value, label, or visible text |
-| `type <text>` | Type into focused element |
-| `upload <sel> <file> [file2...]` | Upload file(s) |
-| `useragent <string>` | Set user agent |
-| `viewport <WxH>` | Set viewport size |
-| `wait <sel|--networkidle|--load>` | Wait for element, network idle, or page load (timeout: 15s) |
+| `click <sel>` | 要素をクリック |
+| `cookie <name>=<value>` | 現在のページドメインにCookieを設定 |
+| `cookie-import <json>` | JSONファイルからCookieをインポート |
+| `cookie-import-browser [browser] [--domain d]` | インストール済みChromiumブラウザからCookieをインポート（ピッカーを開く、または--domainで直接インポート） |
+| `dialog-accept [text]` | 次のalert/confirm/promptを自動承認。オプションのテキストはプロンプトの応答として送信 |
+| `dialog-dismiss` | 次のダイアログを自動却下 |
+| `fill <sel> <val>` | 入力を埋める |
+| `header <name>:<value>` | カスタムリクエストヘッダーを設定（コロン区切り、機密値は自動マスク） |
+| `hover <sel>` | 要素にホバー |
+| `press <key>` | キーを押す — Enter, Tab, Escape, ArrowUp/Down/Left/Right, Backspace, Delete, Home, End, PageUp, PageDown、またはShift+Enterなどの修飾キー |
+| `scroll [sel]` | 要素をビューにスクロール、セレクターなしの場合はページ最下部にスクロール |
+| `select <sel> <val>` | 値、ラベル、または表示テキストでドロップダウンオプションを選択 |
+| `type <text>` | フォーカスされた要素に入力 |
+| `upload <sel> <file> [file2...]` | ファイルをアップロード |
+| `useragent <string>` | ユーザーエージェントを設定 |
+| `viewport <WxH>` | ビューポートサイズを設定 |
+| `wait <sel|--networkidle|--load>` | 要素、ネットワークアイドル、またはページ読み込みを待機（タイムアウト: 15秒） |
 
-### Inspection
-| Command | Description |
+### 検査
+| コマンド | 説明 |
 |---------|-------------|
-| `attrs <sel|@ref>` | Element attributes as JSON |
-| `console [--clear|--errors]` | Console messages (--errors filters to error/warning) |
-| `cookies` | All cookies as JSON |
-| `css <sel> <prop>` | Computed CSS value |
-| `dialog [--clear]` | Dialog messages |
-| `eval <file>` | Run JavaScript from file and return result as string (path must be under /tmp or cwd) |
-| `is <prop> <sel>` | State check (visible/hidden/enabled/disabled/checked/editable/focused) |
-| `js <expr>` | Run JavaScript expression and return result as string |
-| `network [--clear]` | Network requests |
-| `perf` | Page load timings |
-| `storage [set k v]` | Read all localStorage + sessionStorage as JSON, or set <key> <value> to write localStorage |
+| `attrs <sel|@ref>` | 要素の属性をJSONで表示 |
+| `console [--clear|--errors]` | コンソールメッセージ（--errorsでerror/warningをフィルタ） |
+| `cookies` | すべてのCookieをJSONで表示 |
+| `css <sel> <prop>` | 計算済みCSS値 |
+| `dialog [--clear]` | ダイアログメッセージ |
+| `eval <file>` | ファイルからJavaScriptを実行し結果を文字列で返す（パスは/tmpまたはcwd配下が必要） |
+| `is <prop> <sel>` | 状態チェック（visible/hidden/enabled/disabled/checked/editable/focused） |
+| `js <expr>` | JavaScript式を実行し結果を文字列で返す |
+| `network [--clear]` | ネットワークリクエスト |
+| `perf` | ページ読み込みタイミング |
+| `storage [set k v]` | すべてのlocalStorage + sessionStorageをJSONで読み取り、またはset <key> <value>でlocalStorageに書き込み |
 
-### Visual
-| Command | Description |
+### ビジュアル
+| コマンド | 説明 |
 |---------|-------------|
-| `diff <url1> <url2>` | Text diff between pages |
-| `pdf [path]` | Save as PDF |
-| `responsive [prefix]` | Screenshots at mobile (375x812), tablet (768x1024), desktop (1280x720). Saves as {prefix}-mobile.png etc. |
-| `screenshot [--viewport] [--clip x,y,w,h] [selector|@ref] [path]` | Save screenshot (supports element crop via CSS/@ref, --clip region, --viewport) |
+| `diff <url1> <url2>` | ページ間のテキストdiff |
+| `pdf [path]` | PDFとして保存 |
+| `responsive [prefix]` | モバイル（375x812）、タブレット（768x1024）、デスクトップ（1280x720）でスクリーンショット。{prefix}-mobile.pngなどとして保存 |
+| `screenshot [--viewport] [--clip x,y,w,h] [selector|@ref] [path]` | スクリーンショットを保存（CSS/@refによる要素クロップ、--clipによる領域指定、--viewportをサポート） |
 
-### Snapshot
-| Command | Description |
+### スナップショット
+| コマンド | 説明 |
 |---------|-------------|
-| `snapshot [flags]` | Accessibility tree with @e refs for element selection. Flags: -i interactive only, -c compact, -d N depth limit, -s sel scope, -D diff vs previous, -a annotated screenshot, -o path output, -C cursor-interactive @c refs |
+| `snapshot [flags]` | 要素選択用の@eリファレンス付きアクセシビリティツリー。フラグ: -i インタラクティブのみ, -c コンパクト, -d N 深度制限, -s sel スコープ, -D 前回とのdiff, -a アノテーションスクリーンショット, -o path 出力, -C カーソルインタラクティブ @cリファレンス |
 
-### Meta
-| Command | Description |
+### メタ
+| コマンド | 説明 |
 |---------|-------------|
-| `chain` | Run commands from JSON stdin. Format: [["cmd","arg1",...],...] |
+| `chain` | JSON stdinからコマンドを実行。形式: [["cmd","arg1",...],...] |
 
-### Tabs
-| Command | Description |
+### タブ
+| コマンド | 説明 |
 |---------|-------------|
-| `closetab [id]` | Close tab |
-| `newtab [url]` | Open new tab |
-| `tab <id>` | Switch to tab |
-| `tabs` | List open tabs |
+| `closetab [id]` | タブを閉じる |
+| `newtab [url]` | 新しいタブを開く |
+| `tab <id>` | タブに切り替え |
+| `tabs` | 開いているタブを一覧表示 |
 
-### Server
-| Command | Description |
+### サーバー
+| コマンド | 説明 |
 |---------|-------------|
-| `handoff [message]` | Open visible Chrome at current page for user takeover |
-| `restart` | Restart server |
-| `resume` | Re-snapshot after user takeover, return control to AI |
-| `status` | Health check |
-| `stop` | Shutdown server |
+| `handoff [message]` | 現在のページでユーザー引き継ぎ用に表示可能なChromeを開く |
+| `restart` | サーバーを再起動 |
+| `resume` | ユーザー引き継ぎ後に再スナップショット、AIに制御を戻す |
+| `status` | ヘルスチェック |
+| `stop` | サーバーをシャットダウン |
 
-## Tips
+## ヒント
 
-1. **Navigate once, query many times.** `goto` loads the page; then `text`, `js`, `screenshot` all hit the loaded page instantly.
-2. **Use `snapshot -i` first.** See all interactive elements, then click/fill by ref. No CSS selector guessing.
-3. **Use `snapshot -D` to verify.** Baseline → action → diff. See exactly what changed.
-4. **Use `is` for assertions.** `is visible .modal` is faster and more reliable than parsing page text.
-5. **Use `snapshot -a` for evidence.** Annotated screenshots are great for bug reports.
-6. **Use `snapshot -C` for tricky UIs.** Finds clickable divs that the accessibility tree misses.
-7. **Check `console` after actions.** Catch JS errors that don't surface visually.
-8. **Use `chain` for long flows.** Single command, no per-step CLI overhead.
+1. **一度ナビゲートして、何度もクエリする。** `goto` でページを読み込み、`text`、`js`、`screenshot` はすべて読み込み済みのページに即座にアクセスします。
+2. **最初に `snapshot -i` を使う。** すべてのインタラクティブ要素を確認し、refでクリック/入力。CSSセレクターの推測は不要。
+3. **`snapshot -D` で確認する。** ベースライン → アクション → diff。何が変わったかを正確に把握。
+4. **`is` でアサーションする。** `is visible .modal` はページテキストの解析より高速で信頼性が高い。
+5. **`snapshot -a` でエビデンスを残す。** アノテーション付きスクリーンショットはバグレポートに最適。
+6. **`snapshot -C` で複雑なUIに対応する。** アクセシビリティツリーが見逃すクリック可能なdivを検出。
+7. **アクション後に `console` を確認する。** 視覚的に表面化しないJSエラーをキャッチ。
+8. **`chain` で長いフローを処理する。** 1つのコマンドで、ステップごとのCLIオーバーヘッドなし。

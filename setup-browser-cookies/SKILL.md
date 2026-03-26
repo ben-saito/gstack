@@ -46,78 +46,81 @@ echo '{"skill":"setup-browser-cookies","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","
 for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do [ -f "$_PF" ] && ~/.claude/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true; break; done
 ```
 
-If `PROACTIVE` is `"false"`, do not proactively suggest gstack skills — only invoke
-them when the user explicitly asks. The user opted out of proactive suggestions.
+## 言語（Language）
 
-If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.claude/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
+**すべてのユーザー向け応答・出力・質問を日本語で行うこと。**
+技術用語、コマンド名、コード、ファイルパス、エラーメッセージはそのまま英語を使用。
+AskUserQuestionの内容もすべて日本語で記述すること。
 
-If `LAKE_INTRO` is `no`: Before continuing, introduce the Completeness Principle.
-Tell the user: "gstack follows the **Boil the Lake** principle — always do the complete
-thing when AI makes the marginal cost near-zero. Read more: https://garryslist.org/posts/boil-the-ocean"
-Then offer to open the essay in their default browser:
+`PROACTIVE`が`"false"`の場合、gstackスキルを積極的に提案しないこと — ユーザーが明示的に要求した場合のみ呼び出す。ユーザーは積極的な提案をオプトアウトしている。
+
+出力に`UPGRADE_AVAILABLE <old> <new>`が表示された場合：`~/.claude/skills/gstack/gstack-upgrade/SKILL.md`を読み、「インラインアップグレードフロー」に従う（自動アップグレードが設定されている場合は自動実行、そうでなければAskUserQuestionで4つの選択肢を提示し、辞退された場合はスヌーズ状態を書き込む）。`JUST_UPGRADED <from> <to>`の場合：ユーザーに「gstack v{to}で実行中（アップデート完了！）」と伝えて続行。
+
+`LAKE_INTRO`が`no`の場合：先に完全性の原則を紹介してください。
+ユーザーに伝えること：「gstackは**湖を沸かせ（Boil the Lake）**の原則に従います — AIが限界コストをほぼゼロにする今、常に完全なものを作りましょう。詳しくはこちら：https://garryslist.org/posts/boil-the-ocean」
+ブラウザでエッセイを開くか提案してください：
 
 ```bash
 open https://garryslist.org/posts/boil-the-ocean
 touch ~/.gstack/.completeness-intro-seen
 ```
 
-Only run `open` if the user says yes. Always run `touch` to mark as seen. This only happens once.
+ユーザーが「はい」と言った場合のみ`open`を実行。`touch`は常に実行してマーク済みにする。これは一度だけ行われる。
 
-If `TEL_PROMPTED` is `no` AND `LAKE_INTRO` is `yes`: After the lake intro is handled,
-ask the user about telemetry. Use AskUserQuestion:
+`TEL_PROMPTED`が`no`かつ`LAKE_INTRO`が`yes`の場合：湖のイントロが処理された後、テレメトリについてユーザーに確認する。AskUserQuestionを使用：
 
-> Help gstack get better! Community mode shares usage data (which skills you use, how long
-> they take, crash info) with a stable device ID so we can track trends and fix bugs faster.
-> No code, file paths, or repo names are ever sent.
-> Change anytime with `gstack-config set telemetry off`.
-
-Options:
-- A) Help gstack get better! (recommended)
-- B) No thanks
-
-If A: run `~/.claude/skills/gstack/bin/gstack-config set telemetry community`
-
-If B: ask a follow-up AskUserQuestion:
-
-> How about anonymous mode? We just learn that *someone* used gstack — no unique ID,
-> no way to connect sessions. Just a counter that helps us know if anyone's out there.
+> gstackの改善にご協力ください！コミュニティモードでは使用データ（使用スキル、所要時間、クラッシュ情報）を
+> 安定したデバイスIDと共に共有し、トレンドの追跡やバグ修正に役立てます。
+> コード、ファイルパス、リポジトリ名は一切送信されません。
+> `gstack-config set telemetry off`でいつでも変更可能です。
 
 Options:
-- A) Sure, anonymous is fine
-- B) No thanks, fully off
+- A) gstackの改善に協力する（推奨）
+- B) いいえ、結構です
 
-If B→A: run `~/.claude/skills/gstack/bin/gstack-config set telemetry anonymous`
-If B→B: run `~/.claude/skills/gstack/bin/gstack-config set telemetry off`
+Aの場合：`~/.claude/skills/gstack/bin/gstack-config set telemetry community`を実行
 
-Always run:
+Bの場合：フォローアップのAskUserQuestionを表示：
+
+> 匿名モードはいかがですか？gstackが*誰かに*使われたことだけを記録します — 固有IDなし、
+> セッションの紐付けなし。誰かがいることを知るためのカウンターです。
+
+Options:
+- A) はい、匿名なら大丈夫です
+- B) いいえ、完全にオフにしてください
+
+B→Aの場合：`~/.claude/skills/gstack/bin/gstack-config set telemetry anonymous`を実行
+B→Bの場合：`~/.claude/skills/gstack/bin/gstack-config set telemetry off`を実行
+
+常に実行：
 ```bash
 touch ~/.gstack/.telemetry-prompted
 ```
 
-This only happens once. If `TEL_PROMPTED` is `yes`, skip this entirely.
+これは一度だけ行われる。`TEL_PROMPTED`が`yes`の場合、これを完全にスキップする。
 
-## AskUserQuestion Format
+## AskUserQuestion 形式
 
-**ALWAYS follow this structure for every AskUserQuestion call:**
-1. **Re-ground:** State the project, the current branch (use the `_BRANCH` value printed by the preamble — NOT any branch from conversation history or gitStatus), and the current plan/task. (1-2 sentences)
-2. **Simplify:** Explain the problem in plain English a smart 16-year-old could follow. No raw function names, no internal jargon, no implementation details. Use concrete examples and analogies. Say what it DOES, not what it's called.
-3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — always prefer the complete option over shortcuts (see Completeness Principle). Include `Completeness: X/10` for each option. Calibration: 10 = complete implementation (all edge cases, full coverage), 7 = covers happy path but skips some edges, 3 = shortcut that defers significant work. If both options are 8+, pick the higher; if one is ≤5, flag it.
-4. **Options:** Lettered options: `A) ... B) ... C) ...` — when an option involves effort, show both scales: `(human: ~X / CC: ~Y)`
-5. **One decision per question:** NEVER combine multiple independent decisions into a single AskUserQuestion. Each decision gets its own call with its own recommendation and focused options. Batching multiple AskUserQuestion calls in rapid succession is fine and often preferred. Only after all individual taste decisions are resolved should a final "Approve / Revise / Reject" gate be presented.
+**すべてのAskUserQuestion呼び出しで以下の構造に従うこと：**
+1. **状況確認:** プロジェクト、現在のブランチ（プリアンブルで出力された`_BRANCH`値を使用 — 会話履歴やgitStatusのブランチではない）、現在のプラン/タスクを述べる。（1-2文）
+2. **簡潔に:** 賢い16歳でも理解できる平易な日本語で問題を説明する。生の関数名、内部用語、実装詳細は使わない。具体例と例え話を使う。名前ではなく、何をするかを説明する。
+3. **推奨:** `推奨: [X]を選択。理由: [一行の理由]` — 常にショートカットより完全な選択肢を優先する（完全性の原則を参照）。各選択肢に`Completeness: X/10`を含める。基準：10 = 完全な実装（全エッジケース、完全なカバレッジ）、7 = ハッピーパスはカバーするが一部のエッジを省略、3 = 重要な作業を先送りするショートカット。両方の選択肢が8+の場合、高い方を選択。一方が5以下の場合、フラグを立てる。
+4. **Options:** レター付き選択肢：`A) ... B) ... C) ...` — 選択肢に作業が伴う場合、両方のスケールを表示：`(human: ~X / CC: ~Y)`
+5. **1つの質問に1つの決定：** 複数の独立した決定を1つのAskUserQuestionにまとめてはならない。各決定にはそれぞれのAskUserQuestion呼び出しと推奨と焦点を絞った選択肢を設ける。複数のAskUserQuestion呼び出しを連続して行うのは問題ない。すべての個別の判断が解決された後にのみ、最終的な「承認 / 修正 / 却下」ゲートを提示する。
 
-Assume the user hasn't looked at this window in 20 minutes and doesn't have the code open. If you'd need to read the source to understand your own explanation, it's too complex.
+ユーザーは20分間このウィンドウを見ておらず、コードも開いていないと仮定すること。自分の説明を理解するためにソースを読む必要があるなら、複雑すぎる。
 
-Per-skill instructions may add additional formatting rules on top of this baseline.
+スキルごとの指示が、このベースラインに追加のフォーマットルールを加える場合がある。
 
-## Completeness Principle — Boil the Lake
+## 完全性の原則 — 湖を沸かせ（Boil the Lake）
 
-AI-assisted coding makes the marginal cost of completeness near-zero. When you present options:
+AIアシストコーディングは完全性の限界コストをほぼゼロにする。選択肢を提示する際：
 
-- If Option A is the complete implementation (full parity, all edge cases, 100% coverage) and Option B is a shortcut that saves modest effort — **always recommend A**. The delta between 80 lines and 150 lines is meaningless with CC+gstack. "Good enough" is the wrong instinct when "complete" costs minutes more.
-- **Lake vs. ocean:** A "lake" is boilable — 100% test coverage for a module, full feature implementation, handling all edge cases, complete error paths. An "ocean" is not — rewriting an entire system from scratch, adding features to dependencies you don't control, multi-quarter platform migrations. Recommend boiling lakes. Flag oceans as out of scope.
-- **When estimating effort**, always show both scales: human team time and CC+gstack time. The compression ratio varies by task type — use this reference:
+- 選択肢Aが完全な実装（完全な互換性、全エッジケース、100%カバレッジ）で、選択肢Bがわずかな労力を節約するショートカットの場合 — **常にAを推奨する**。CC+gstackでは80行と150行の差は無意味。「完全」が数分余分にかかるだけなら「十分」は誤った判断。
+- **湖 vs. 海：**「湖」は沸かせる — モジュールの100%テストカバレッジ、完全な機能実装、全エッジケースの処理、完全なエラーパス。「海」は沸かせない — システム全体のスクラッチからの書き直し、自分が管理しない依存関係への機能追加、複数四半期にわたるプラットフォーム移行。湖を沸かすことを推奨する。海はスコープ外としてフラグを立てる。
+- **工数を見積もる際**、常に両方のスケールを表示する：人間チームの時間とCC+gstackの時間。圧縮率はタスクの種類によって異なる — 以下を参考にする：
 
-| Task type | Human team | CC+gstack | Compression |
+| タスクの種類 | Human team | CC+gstack | Compression |
 |-----------|-----------|-----------|-------------|
 | Boilerplate / scaffolding | 2 days | 15 min | ~100x |
 | Test writing | 1 day | 15 min | ~50x |
@@ -126,57 +129,57 @@ AI-assisted coding makes the marginal cost of completeness near-zero. When you p
 | Architecture / design | 2 days | 4 hours | ~5x |
 | Research / exploration | 1 day | 3 hours | ~3x |
 
-- This principle applies to test coverage, error handling, documentation, edge cases, and feature completeness. Don't skip the last 10% to "save time" — with AI, that 10% costs seconds.
+- この原則はテストカバレッジ、エラーハンドリング、ドキュメント、エッジケース、機能の完全性に適用される。AIを使えば残り10%は数秒のコスト — 「時間節約のため」に最後の10%をスキップしない。
 
-**Anti-patterns — DON'T do this:**
-- BAD: "Choose B — it covers 90% of the value with less code." (If A is only 70 lines more, choose A.)
-- BAD: "We can skip edge case handling to save time." (Edge case handling costs minutes with CC.)
-- BAD: "Let's defer test coverage to a follow-up PR." (Tests are the cheapest lake to boil.)
-- BAD: Quoting only human-team effort: "This would take 2 weeks." (Say: "2 weeks human / ~1 hour CC.")
+**アンチパターン — これをやってはいけない：**
+- 悪い例：「Bを選択 — 少ないコードで90%の価値をカバー。」（Aがわずか70行多いだけなら、Aを選択。）
+- 悪い例：「時間節約のためエッジケース処理を省略。」（CCではエッジケース処理は数分のコスト。）
+- 悪い例：「テストカバレッジはフォローアップPRに先送り。」（テストは最も安く沸かせる湖。）
+- 悪い例：人間チームの工数のみを引用：「これは2週間かかります。」（「2 weeks human / ~1 hour CC」と言う。）
 
-## Repo Ownership Mode — See Something, Say Something
+## リポジトリ所有モード — 気づいたら声を上げる
 
-`REPO_MODE` from the preamble tells you who owns issues in this repo:
+プリアンブルの`REPO_MODE`はこのリポジトリの課題を誰が所有しているかを示す：
 
-- **`solo`** — One person does 80%+ of the work. They own everything. When you notice issues outside the current branch's changes (test failures, deprecation warnings, security advisories, linting errors, dead code, env problems), **investigate and offer to fix proactively**. The solo dev is the only person who will fix it. Default to action.
-- **`collaborative`** — Multiple active contributors. When you notice issues outside the branch's changes, **flag them via AskUserQuestion** — it may be someone else's responsibility. Default to asking, not fixing.
-- **`unknown`** — Treat as collaborative (safer default — ask before fixing).
+- **`solo`** — 1人が80%以上の作業を行う。すべてを所有。現在のブランチの変更以外の問題（テスト失敗、非推奨警告、セキュリティ勧告、lintエラー、デッドコード、環境問題）に気づいた場合、**積極的に調査して修正を提案する**。soloの開発者がそれを修正する唯一の人物。アクションをデフォルトにする。
+- **`collaborative`** — 複数のアクティブなコントリビューター。ブランチの変更以外の問題に気づいた場合、**AskUserQuestionでフラグを立てる** — 他の人の責任かもしれない。修正ではなく確認をデフォルトにする。
+- **`unknown`** — collaborativeとして扱う（安全なデフォルト — 修正前に確認する）。
 
-**See Something, Say Something:** Whenever you notice something that looks wrong during ANY workflow step — not just test failures — flag it briefly. One sentence: what you noticed and its impact. In solo mode, follow up with "Want me to fix it?" In collaborative mode, just flag it and move on.
+**気づいたら声を上げる：** ワークフローのどのステップでも — テスト失敗だけでなく — 何かおかしいことに気づいたら、簡潔にフラグを立てる。1文：何に気づいたか、その影響。soloモードでは「修正しましょうか？」とフォローアップ。collaborativeモードではフラグを立てて先に進む。
 
-Never let a noticed issue silently pass. The whole point is proactive communication.
+気づいた問題を黙って見過ごさない。積極的なコミュニケーションこそがポイント。
 
-## Search Before Building
+## 作る前に探せ（Search Before Building）
 
-Before building infrastructure, unfamiliar patterns, or anything the runtime might have a built-in — **search first.** Read `~/.claude/skills/gstack/ETHOS.md` for the full philosophy.
+インフラ構築、馴染みのないパターン、またはランタイムにビルトインがあるかもしれないものを作る前に — **まず検索する。** 完全な哲学については`~/.claude/skills/gstack/ETHOS.md`を読む。
 
-**Three layers of knowledge:**
-- **Layer 1** (tried and true — in distribution). Don't reinvent the wheel. But the cost of checking is near-zero, and once in a while, questioning the tried-and-true is where brilliance occurs.
-- **Layer 2** (new and popular — search for these). But scrutinize: humans are subject to mania. Search results are inputs to your thinking, not answers.
-- **Layer 3** (first principles — prize these above all). Original observations derived from reasoning about the specific problem. The most valuable of all.
+**知識の3つのレイヤー：**
+- **レイヤー1**（実績あり — 分布内）。車輪の再発明をしない。ただし確認のコストはほぼゼロで、たまに実績あるものに疑問を持つことが輝きを生む。
+- **レイヤー2**（新しくて人気 — これらを検索）。ただし精査する：人間はマニアに陥りやすい。検索結果は思考への入力であり、答えではない。
+- **レイヤー3**（第一原理 — これを何より重視）。特定の問題についての推論から導き出された独自の観察。最も価値がある。
 
-**Eureka moment:** When first-principles reasoning reveals conventional wisdom is wrong, name it:
-"EUREKA: Everyone does X because [assumption]. But [evidence] shows this is wrong. Y is better because [reasoning]."
+**ユーレカの瞬間：** 第一原理的推論が通説の誤りを明らかにした時、名前を付ける：
+「EUREKA: みんながXをしているのは[仮定]のため。しかし[証拠]がこれは間違いだと示している。Yの方が優れている。理由：[推論]。」
 
-Log eureka moments:
+ユーレカの瞬間を記録：
 ```bash
 jq -n --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg skill "SKILL_NAME" --arg branch "$(git branch --show-current 2>/dev/null)" --arg insight "ONE_LINE_SUMMARY" '{ts:$ts,skill:$skill,branch:$branch,insight:$insight}' >> ~/.gstack/analytics/eureka.jsonl 2>/dev/null || true
 ```
-Replace SKILL_NAME and ONE_LINE_SUMMARY. Runs inline — don't stop the workflow.
+SKILL_NAMEとONE_LINE_SUMMARYを置き換える。インラインで実行 — ワークフローを止めない。
 
-**WebSearch fallback:** If WebSearch is unavailable, skip the search step and note: "Search unavailable — proceeding with in-distribution knowledge only."
+**WebSearchフォールバック：** WebSearchが利用できない場合、検索ステップをスキップして次を記載：「検索利用不可 — 分布内の知識のみで進行。」
 
-## Contributor Mode
+## コントリビューターモード
 
-If `_CONTRIB` is `true`: you are in **contributor mode**. You're a gstack user who also helps make it better.
+`_CONTRIB`が`true`の場合：あなたは**コントリビューターモード**。gstackのユーザーであり、改善にも協力する立場。
 
-**At the end of each major workflow step** (not after every single command), reflect on the gstack tooling you used. Rate your experience 0 to 10. If it wasn't a 10, think about why. If there is an obvious, actionable bug OR an insightful, interesting thing that could have been done better by gstack code or skill markdown — file a field report. Maybe our contributor will help make us better!
+**各主要ワークフローステップの終了時**（すべてのコマンドの後ではなく）、使用したgstackツールを振り返る。体験を0〜10で評価する。10でなかった場合、その理由を考える。明確でアクション可能なバグ、またはgstackのコードやスキルマークダウンでもっとうまくできた洞察的で興味深いことがあれば、フィールドレポートを提出する。コントリビューターが改善の手助けをしてくれるかもしれない！
 
-**Calibration — this is the bar:** For example, `$B js "await fetch(...)"` used to fail with `SyntaxError: await is only valid in async functions` because gstack didn't wrap expressions in async context. Small, but the input was reasonable and gstack should have handled it — that's the kind of thing worth filing. Things less consequential than this, ignore.
+**基準 — これがバー：** 例えば、`$B js "await fetch(...)"`が以前`SyntaxError: await is only valid in async functions`で失敗していた。gstackが式をasyncコンテキストでラップしなかったため。小さいが、入力は妥当でgstackが処理すべきだった — これが報告に値するレベル。これより重要でないものは無視する。
 
-**NOT worth filing:** user's app bugs, network errors to user's URL, auth failures on user's site, user's own JS logic bugs.
+**報告に値しない：** ユーザーのアプリのバグ、ユーザーのURLへのネットワークエラー、ユーザーのサイトの認証失敗、ユーザー自身のJSロジックバグ。
 
-**To file:** write `~/.gstack/contributor-logs/{slug}.md` with **all sections below** (do not truncate — include every section through the Date/Version footer):
+**報告するには：** `~/.gstack/contributor-logs/{slug}.md`に**以下のすべてのセクション**を記述する（省略しない — Date/Versionフッターまですべてのセクションを含める）：
 
 ```
 # {Title}
@@ -201,46 +204,42 @@ Hey gstack team — ran into this while using /{skill-name}:
 **Date:** {YYYY-MM-DD} | **Version:** {gstack version} | **Skill:** /{skill}
 ```
 
-Slug: lowercase, hyphens, max 60 chars (e.g. `browse-js-no-await`). Skip if file already exists. Max 3 reports per session. File inline and continue — don't stop the workflow. Tell user: "Filed gstack field report: {title}"
+スラグ：小文字、ハイフン、最大60文字（例：`browse-js-no-await`）。ファイルが既に存在する場合はスキップ。セッションあたり最大3件のレポート。インラインで提出して続行 — ワークフローを止めない。ユーザーに伝える：「gstackフィールドレポートを提出しました：{title}」
 
-## Completion Status Protocol
+## 完了ステータスプロトコル
 
-When completing a skill workflow, report status using one of:
-- **DONE** — All steps completed successfully. Evidence provided for each claim.
-- **DONE_WITH_CONCERNS** — Completed, but with issues the user should know about. List each concern.
-- **BLOCKED** — Cannot proceed. State what is blocking and what was tried.
-- **NEEDS_CONTEXT** — Missing information required to continue. State exactly what you need.
+スキルワークフロー完了時、以下のいずれかでステータスを報告する：
+- **DONE** — すべてのステップが正常に完了。各主張にエビデンスを提供。
+- **DONE_WITH_CONCERNS** — 完了したが、ユーザーが知るべき問題あり。各懸念を列挙。
+- **BLOCKED** — 続行不可。ブロッカーと試行した内容を記述。
+- **NEEDS_CONTEXT** — 続行に必要な情報が不足。必要な情報を正確に記述。
 
-### Escalation
+### エスカレーション
 
-It is always OK to stop and say "this is too hard for me" or "I'm not confident in this result."
+「これは自分には難しすぎる」「この結果に自信がない」と言って止めるのは常に許される。
 
-Bad work is worse than no work. You will not be penalized for escalating.
-- If you have attempted a task 3 times without success, STOP and escalate.
-- If you are uncertain about a security-sensitive change, STOP and escalate.
-- If the scope of work exceeds what you can verify, STOP and escalate.
+悪い仕事は仕事をしないより悪い。エスカレーションでペナルティを受けることはない。
+- タスクを3回試行して成功しなかった場合、停止してエスカレーションする。
+- セキュリティに関わる変更に確信がない場合、停止してエスカレーションする。
+- 作業の範囲が検証可能な範囲を超える場合、停止してエスカレーションする。
 
-Escalation format:
+エスカレーション形式：
 ```
 STATUS: BLOCKED | NEEDS_CONTEXT
-REASON: [1-2 sentences]
-ATTEMPTED: [what you tried]
-RECOMMENDATION: [what the user should do next]
+REASON: [1-2文]
+ATTEMPTED: [試行した内容]
+RECOMMENDATION: [ユーザーが次にすべきこと]
 ```
 
-## Telemetry (run last)
+## テレメトリ（最後に実行）
 
-After the skill workflow completes (success, error, or abort), log the telemetry event.
-Determine the skill name from the `name:` field in this file's YAML frontmatter.
-Determine the outcome from the workflow result (success if completed normally, error
-if it failed, abort if the user interrupted).
+スキルワークフロー完了後（成功、エラー、中断のいずれか）、テレメトリイベントを記録する。
+このファイルのYAMLフロントマターの`name:`フィールドからスキル名を判定する。
+ワークフロー結果から結果を判定する（正常完了ならsuccess、失敗ならerror、ユーザーが中断したらabort）。
 
-**PLAN MODE EXCEPTION — ALWAYS RUN:** This command writes telemetry to
-`~/.gstack/analytics/` (user config directory, not project files). The skill
-preamble already writes to the same directory — this is the same pattern.
-Skipping this command loses session duration and outcome data.
+**プランモード例外 — 常に実行：** このコマンドは`~/.gstack/analytics/`（ユーザー設定ディレクトリ、プロジェクトファイルではない）にテレメトリを書き込む。スキルのプリアンブルも同じディレクトリに書き込む — これは同じパターン。このコマンドをスキップするとセッション時間と結果データが失われる。
 
-Run this bash:
+以下のbashを実行：
 
 ```bash
 _TEL_END=$(date +%s)
@@ -251,29 +250,24 @@ rm -f ~/.gstack/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
   --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
 ```
 
-Replace `SKILL_NAME` with the actual skill name from frontmatter, `OUTCOME` with
-success/error/abort, and `USED_BROWSE` with true/false based on whether `$B` was used.
-If you cannot determine the outcome, use "unknown". This runs in the background and
-never blocks the user.
+`SKILL_NAME`をフロントマターの実際のスキル名に、`OUTCOME`をsuccess/error/abortに、`USED_BROWSE`を`$B`が使用されたかどうかに基づいてtrue/falseに置き換える。結果を判定できない場合は"unknown"を使用。バックグラウンドで実行されユーザーをブロックしない。
 
-## Plan Status Footer
+## プランステータスフッター
 
-When you are in plan mode and about to call ExitPlanMode:
+プランモードでExitPlanModeを呼び出す直前：
 
-1. Check if the plan file already has a `## GSTACK REVIEW REPORT` section.
-2. If it DOES — skip (a review skill already wrote a richer report).
-3. If it does NOT — run this command:
+1. プランファイルに既に`## GSTACK REVIEW REPORT`セクションがあるか確認する。
+2. ある場合 — スキップ（レビュースキルがより詳細なレポートを書いている）。
+3. ない場合 — 以下のコマンドを実行する：
 
 \`\`\`bash
 ~/.claude/skills/gstack/bin/gstack-review-read
 \`\`\`
 
-Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
+プランファイルの末尾に`## GSTACK REVIEW REPORT`セクションを記述する：
 
-- If the output contains review entries (JSONL lines before `---CONFIG---`): format the
-  standard report table with runs/status/findings per skill, same format as the review
-  skills use.
-- If the output is `NO_REVIEWS` or empty: write this placeholder table:
+- 出力にレビューエントリ（`---CONFIG---`の前のJSONL行）が含まれる場合：レビュースキルが使用するのと同じ形式で、スキルごとの実行回数/ステータス/所見を含む標準レポートテーブルをフォーマットする。
+- 出力が`NO_REVIEWS`または空の場合：以下のプレースホルダーテーブルを記述する：
 
 \`\`\`markdown
 ## GSTACK REVIEW REPORT
@@ -288,26 +282,24 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 **VERDICT:** NO REVIEWS YET — run \`/autoplan\` for full review pipeline, or individual reviews above.
 \`\`\`
 
-**PLAN MODE EXCEPTION — ALWAYS RUN:** This writes to the plan file, which is the one
-file you are allowed to edit in plan mode. The plan file review report is part of the
-plan's living status.
+**プランモード例外 — 常に実行：** これはプランファイルに書き込む。プランモードで編集が許可されている唯一のファイルである。プランファイルのレビューレポートはプランの生きたステータスの一部。
 
-# Setup Browser Cookies
+# ブラウザCookieのセットアップ
 
-Import logged-in sessions from your real Chromium browser into the headless browse session.
+実際のChromiumブラウザからログイン済みセッションをヘッドレスbrowseセッションにインポートする。
 
-## How it works
+## 仕組み
 
-1. Find the browse binary
-2. Run `cookie-import-browser` to detect installed browsers and open the picker UI
-3. User selects which cookie domains to import in their browser
-4. Cookies are decrypted and loaded into the Playwright session
+1. browseバイナリを見つける
+2. `cookie-import-browser`を実行してインストール済みブラウザを検出し、ピッカーUIを開く
+3. ユーザーがブラウザでインポートするCookieドメインを選択する
+4. Cookieが復号化されPlaywrightセッションに読み込まれる
 
-## Steps
+## ステップ
 
-### 1. Find the browse binary
+### 1. browseバイナリを見つける
 
-## SETUP (run this check BEFORE any browse command)
+## セットアップ（browseコマンドの前にこのチェックを実行）
 
 ```bash
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
@@ -321,50 +313,49 @@ else
 fi
 ```
 
-If `NEEDS_SETUP`:
-1. Tell the user: "gstack browse needs a one-time build (~10 seconds). OK to proceed?" Then STOP and wait.
-2. Run: `cd <SKILL_DIR> && ./setup`
-3. If `bun` is not installed: `curl -fsSL https://bun.sh/install | bash`
+`NEEDS_SETUP`の場合：
+1. ユーザーに伝える：「gstack browseは一度だけのビルドが必要です（約10秒）。実行してよろしいですか？」その後停止して待機。
+2. 実行：`cd <SKILL_DIR> && ./setup`
+3. `bun`がインストールされていない場合：`curl -fsSL https://bun.sh/install | bash`
 
-### 2. Open the cookie picker
+### 2. Cookieピッカーを開く
 
 ```bash
 $B cookie-import-browser
 ```
 
-This auto-detects installed Chromium browsers and opens
-an interactive picker UI in your default browser where you can:
-- Switch between installed browsers
-- Search domains
-- Click "+" to import a domain's cookies
-- Click trash to remove imported cookies
+インストール済みのChromiumブラウザを自動検出し、デフォルトブラウザでインタラクティブなピッカーUIを開く。以下の操作が可能：
+- インストール済みブラウザの切り替え
+- ドメインの検索
+- 「+」をクリックしてドメインのCookieをインポート
+- ゴミ箱をクリックしてインポート済みCookieを削除
 
-Tell the user: **"Cookie picker opened — select the domains you want to import in your browser, then tell me when you're done."**
+ユーザーに伝える：**「Cookieピッカーが開きました — ブラウザでインポートしたいドメインを選択して、完了したら教えてください。」**
 
-### 3. Direct import (alternative)
+### 3. 直接インポート（代替方法）
 
-If the user specifies a domain directly (e.g., `/setup-browser-cookies github.com`), skip the UI:
+ユーザーがドメインを直接指定した場合（例：`/setup-browser-cookies github.com`）、UIをスキップする：
 
 ```bash
 $B cookie-import-browser comet --domain github.com
 ```
 
-Replace `comet` with the appropriate browser if specified.
+指定された場合、`comet`を適切なブラウザに置き換える。
 
-### 4. Verify
+### 4. 確認
 
-After the user confirms they're done:
+ユーザーが完了を確認した後：
 
 ```bash
 $B cookies
 ```
 
-Show the user a summary of imported cookies (domain counts).
+インポートされたCookieのサマリー（ドメイン別のカウント）をユーザーに表示する。
 
-## Notes
+## 注意事項
 
-- On macOS, the first import per browser may trigger a Keychain dialog — click "Allow" / "Always Allow"
-- On Linux, `v11` cookies may require `secret-tool`/libsecret access; `v10` cookies use Chromium's standard fallback key
-- Cookie picker is served on the same port as the browse server (no extra process)
-- Only domain names and cookie counts are shown in the UI — no cookie values are exposed
-- The browse session persists cookies between commands, so imported cookies work immediately
+- macOSでは、ブラウザごとの初回インポート時にキーチェーンダイアログが表示される場合がある — 「許可」/「常に許可」をクリックする
+- Linuxでは、`v11`のCookieに`secret-tool`/libsecretアクセスが必要な場合がある。`v10`のCookieはChromiumの標準フォールバックキーを使用する
+- Cookieピッカーはbrowseサーバーと同じポートで提供される（追加プロセスは不要）
+- UIにはドメイン名とCookieの数のみが表示される — Cookie値は公開されない
+- browseセッションはコマンド間でCookieを保持するため、インポートしたCookieはすぐに機能する
