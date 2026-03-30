@@ -1,12 +1,12 @@
-# アーキテクチャ
+# Architecture
 
-このドキュメントでは、gstackが**なぜ**このように構築されているかを説明します。セットアップとコマンドについてはCLAUDE.mdを、コントリビュートについてはCONTRIBUTING.mdを参照してください。
+This document explains **why** gstack is built the way it is. For setup and commands, see CLAUDE.md. For contributing, see CONTRIBUTING.md.
 
-## 核心的アイデア
+## The core idea
 
-gstackはClaude Codeに永続的なブラウザと一連のオピニオンを持ったワークフロースキルを提供します。ブラウザが難しい部分です — それ以外はすべてMarkdownです。
+gstack gives Claude Code a persistent browser and a set of opinionated workflow skills. The browser is the hard part — everything else is Markdown.
 
-重要な洞察：AIエージェントがブラウザとやり取りするには**サブセカンドのレイテンシ**と**永続的な状態**が必要です。すべてのコマンドでブラウザをコールドスタートすると、ツールコールごとに3-5秒待つことになります。コマンド間でブラウザが死ぬと、Cookie、タブ、ログインセッションがすべて失われます。そこでgstackは、CLIがlocalhost HTTPで通信する長寿命のChromiumデーモンを実行します。
+The key insight: an AI agent interacting with a browser needs **sub-second latency** and **persistent state**. If every command cold-starts a browser, you're waiting 3-5 seconds per tool call. If the browser dies between commands, you lose cookies, tabs, and login sessions. So gstack runs a long-lived Chromium daemon that the CLI talks to over localhost HTTP.
 
 ```
 Claude Code                     gstack
@@ -33,118 +33,118 @@ Claude Code                     gstack
                                └───────────────────────┘
 ```
 
-最初の呼び出しですべてが起動します（約3秒）。以降の呼び出し：約100-200ms。
+First call starts everything (~3s). Every call after: ~100-200ms.
 
-## なぜBunか
+## Why Bun
 
-Node.jsでも動作しますが、Bunの方が3つの理由で優れています：
+Node.js would work. Bun is better here for three reasons:
 
-1. **コンパイル済みバイナリ。** `bun build --compile`で約58MBの単一実行ファイルを生成します。ランタイムで`node_modules`不要、`npx`不要、PATH設定不要。バイナリがそのまま実行できます。gstackは`~/.claude/skills/`にインストールされるため、ユーザーがNode.jsプロジェクトの管理を期待しない場所で重要です。
+1. **Compiled binaries.** `bun build --compile` produces a single ~58MB executable. No `node_modules` at runtime, no `npx`, no PATH configuration. The binary just runs. This matters because gstack installs into `~/.claude/skills/` where users don't expect to manage a Node.js project.
 
-2. **ネイティブSQLite。** Cookie復号はChromiumのSQLite Cookieデータベースを直接読み取ります。Bunには`new Database()`が組み込まれています — `better-sqlite3`不要、ネイティブアドオンのコンパイル不要、gyp不要。異なるマシンで壊れる要因が1つ減ります。
+2. **Native SQLite.** Cookie decryption reads Chromium's SQLite cookie database directly. Bun has `new Database()` built in — no `better-sqlite3`, no native addon compilation, no gyp. One less thing that breaks on different machines.
 
-3. **ネイティブTypeScript。** 開発中はサーバーを`bun run server.ts`で実行します。コンパイルステップ不要、`ts-node`不要、デバッグするソースマップ不要。コンパイル済みバイナリはデプロイ用、ソースファイルは開発用です。
+3. **Native TypeScript.** The server runs as `bun run server.ts` during development. No compilation step, no `ts-node`, no source maps to debug. The compiled binary is for deployment; source files are for development.
 
-4. **組み込みHTTPサーバー。** `Bun.serve()`は高速でシンプルで、ExpressやFastifyが不要です。サーバーは合計約10ルートを処理します。フレームワークはオーバーヘッドになります。
+4. **Built-in HTTP server.** `Bun.serve()` is fast, simple, and doesn't need Express or Fastify. The server handles ~10 routes total. A framework would be overhead.
 
-ボトルネックは常にChromiumであり、CLIやサーバーではありません。Bunの起動速度（コンパイル済みバイナリで約1ms vs Nodeで約100ms）は良いですが、選択した理由ではありません。コンパイル済みバイナリとネイティブSQLiteが理由です。
+The bottleneck is always Chromium, not the CLI or server. Bun's startup speed (~1ms for the compiled binary vs ~100ms for Node) is nice but not the reason we chose it. The compiled binary and native SQLite are.
 
-## デーモンモデル
+## The daemon model
 
-### なぜコマンドごとにブラウザを起動しないのか？
+### Why not start a browser per command?
 
-Playwrightは約2-3秒でChromiumを起動できます。単一のスクリーンショットなら問題ありません。20以上のコマンドを使うQAセッションでは、40秒以上のブラウザ起動オーバーヘッドになります。さらに悪いことに：コマンド間ですべての状態が失われます。Cookie、localStorage、ログインセッション、開いたタブ — すべてなくなります。
+Playwright can launch Chromium in ~2-3 seconds. For a single screenshot, that's fine. For a QA session with 20+ commands, it's 40+ seconds of browser startup overhead. Worse: you lose all state between commands. Cookies, localStorage, login sessions, open tabs — all gone.
 
-デーモンモデルの意味：
+The daemon model means:
 
-- **永続的な状態。** 一度ログインすれば、ログインしたまま。タブを開けば、開いたまま。localStorageはコマンド間で持続します。
-- **サブセカンドコマンド。** 最初の呼び出しの後、すべてのコマンドはHTTP POSTです。約100-200msのラウンドトリップ（Chromiumの作業を含む）。
-- **自動ライフサイクル。** サーバーは初回使用時に自動起動し、30分アイドル後に自動シャットダウン。プロセス管理は不要です。
+- **Persistent state.** Log in once, stay logged in. Open a tab, it stays open. localStorage persists across commands.
+- **Sub-second commands.** After the first call, every command is just an HTTP POST. ~100-200ms round-trip including Chromium's work.
+- **Automatic lifecycle.** The server auto-starts on first use, auto-shuts down after 30 minutes idle. No process management needed.
 
-### 状態ファイル
+### State file
 
-サーバーは`.gstack/browse.json`（アトミック書き込み：tmp + rename、モード0o600）を書き込みます：
+The server writes `.gstack/browse.json` (atomic write via tmp + rename, mode 0o600):
 
 ```json
 { "pid": 12345, "port": 34567, "token": "uuid-v4", "startedAt": "...", "binaryVersion": "abc123" }
 ```
 
-CLIはこのファイルを読んでサーバーを見つけます。ファイルがないか、サーバーがHTTPヘルスチェックに失敗した場合、CLIは新しいサーバーを起動します。Windowsでは、BunバイナリでPIDベースのプロセス検出が不安定なため、ヘルスチェック（GET /health）がすべてのプラットフォームでの主要な生存信号です。
+The CLI reads this file to find the server. If the file is missing or the server fails an HTTP health check, the CLI spawns a new server. On Windows, PID-based process detection is unreliable in Bun binaries, so the health check (GET /health) is the primary liveness signal on all platforms.
 
-### ポート選択
+### Port selection
 
-10000-60000の間のランダムポート（衝突時は最大5回リトライ）。これにより、10のConductorワークスペースがそれぞれ独自のbrowseデーモンを設定ゼロ、ポート衝突ゼロで実行できます。旧方式（9400-9409のスキャン）はマルチワークスペース環境で頻繁に壊れていました。
+Random port between 10000-60000 (retry up to 5 on collision). This means 10 Conductor workspaces can each run their own browse daemon with zero configuration and zero port conflicts. The old approach (scanning 9400-9409) broke constantly in multi-workspace setups.
 
-### バージョン自動再起動
+### Version auto-restart
 
-ビルド時に`git rev-parse HEAD`を`browse/dist/.version`に書き込みます。各CLI呼び出し時に、バイナリのバージョンが実行中サーバーの`binaryVersion`と一致しない場合、CLIは古いサーバーを停止して新しいサーバーを起動します。これにより「古いバイナリ」クラスのバグが完全に防止されます — バイナリを再ビルドすれば、次のコマンドが自動的に検出します。
+The build writes `git rev-parse HEAD` to `browse/dist/.version`. On each CLI invocation, if the binary's version doesn't match the running server's `binaryVersion`, the CLI kills the old server and starts a new one. This prevents the "stale binary" class of bugs entirely — rebuild the binary, next command picks it up automatically.
 
-## セキュリティモデル
+## Security model
 
-### localhostのみ
+### Localhost only
 
-HTTPサーバーは`localhost`にバインドし、`0.0.0.0`にはバインドしません。ネットワークからアクセスできません。
+The HTTP server binds to `localhost`, not `0.0.0.0`. It's not reachable from the network.
 
-### Bearerトークン認証
+### Bearer token auth
 
-各サーバーセッションはランダムなUUIDトークンを生成し、モード0o600（オーナーのみ読み取り可）で状態ファイルに書き込みます。すべてのHTTPリクエストに`Authorization: Bearer <token>`が必要です。トークンが一致しない場合、サーバーは401を返します。
+Every server session generates a random UUID token, written to the state file with mode 0o600 (owner-only read). Every HTTP request must include `Authorization: Bearer <token>`. If the token doesn't match, the server returns 401.
 
-これにより、同じマシン上の他のプロセスがbrowseサーバーと通信することを防ぎます。Cookie picker UI（`/cookie-picker`）とヘルスチェック（`/health`）は免除されます — localhost専用でコマンドを実行しません。
+This prevents other processes on the same machine from talking to your browse server. The cookie picker UI (`/cookie-picker`) and health check (`/health`) are exempt — they're localhost-only and don't execute commands.
 
-### Cookieセキュリティ
+### Cookie security
 
-Cookieはgstackが扱う最も機密性の高いデータです。設計：
+Cookies are the most sensitive data gstack handles. The design:
 
-1. **Keychainアクセスにはユーザーの承認が必要。** ブラウザごとの最初のCookieインポート時にmacOS Keychainダイアログが表示されます。ユーザーが「許可」または「常に許可」をクリックする必要があります。gstackは暗黙的に認証情報にアクセスすることはありません。
+1. **Keychain access requires user approval.** First cookie import per browser triggers a macOS Keychain dialog. The user must click "Allow" or "Always Allow." gstack never silently accesses credentials.
 
-2. **復号はインプロセスで行われる。** Cookie値はメモリ内で復号され（PBKDF2 + AES-128-CBC）、Playwrightコンテキストにロードされ、平文でディスクに書き込まれることはありません。Cookie picker UIはCookie値を表示しません — ドメイン名と件数のみ。
+2. **Decryption happens in-process.** Cookie values are decrypted in memory (PBKDF2 + AES-128-CBC), loaded into the Playwright context, and never written to disk in plaintext. The cookie picker UI never displays cookie values — only domain names and counts.
 
-3. **データベースは読み取り専用。** gstackはChromium Cookie DBを一時ファイルにコピーし（実行中のブラウザとのSQLiteロック競合を避けるため）、読み取り専用で開きます。実際のブラウザのCookieデータベースを変更することはありません。
+3. **Database is read-only.** gstack copies the Chromium cookie DB to a temp file (to avoid SQLite lock conflicts with the running browser) and opens it read-only. It never modifies your real browser's cookie database.
 
-4. **キーキャッシュはセッション単位。** Keychainパスワード + 派生AESキーはサーバーの存続期間中メモリにキャッシュされます。サーバーがシャットダウンすると（アイドルタイムアウトまたは明示的停止）、キャッシュはなくなります。
+4. **Key caching is per-session.** The Keychain password + derived AES key are cached in memory for the server's lifetime. When the server shuts down (idle timeout or explicit stop), the cache is gone.
 
-5. **ログにCookie値なし。** コンソール、ネットワーク、ダイアログのログにCookie値は含まれません。`cookies`コマンドはCookieメタデータ（ドメイン、名前、有効期限）を出力しますが、値は切り詰められます。
+5. **No cookie values in logs.** Console, network, and dialog logs never contain cookie values. The `cookies` command outputs cookie metadata (domain, name, expiry) but values are truncated.
 
-### シェルインジェクション防止
+### Shell injection prevention
 
-ブラウザレジストリ（Comet、Chrome、Arc、Brave、Edge）はハードコードされています。データベースパスは既知の定数から構築され、ユーザー入力からは構築されません。Keychainアクセスは`Bun.spawn()`で明示的な引数配列を使用し、シェル文字列補間は使用しません。
+The browser registry (Comet, Chrome, Arc, Brave, Edge) is hardcoded. Database paths are constructed from known constants, never from user input. Keychain access uses `Bun.spawn()` with explicit argument arrays, not shell string interpolation.
 
-## refシステム
+## The ref system
 
-ref（`@e1`、`@e2`、`@c1`）は、エージェントがCSSセレクタやXPathを書かずにページ要素にアクセスする方法です。
+Refs (`@e1`, `@e2`, `@c1`) are how the agent addresses page elements without writing CSS selectors or XPath.
 
-### 仕組み
+### How it works
 
 ```
-1. エージェント実行: $B snapshot -i
-2. サーバーがPlaywrightのpage.accessibility.snapshot()を呼び出す
-3. パーサーがARIAツリーを走査し、連番refを割り当て: @e1, @e2, @e3...
-4. 各refに対し、Playwright Locatorを構築: getByRole(role, { name }).nth(index)
-5. Map<string, RefEntry>をBrowserManagerインスタンスに保存（role + name + Locator）
-6. 注釈付きツリーをプレーンテキストで返す
+1. Agent runs: $B snapshot -i
+2. Server calls Playwright's page.accessibility.snapshot()
+3. Parser walks the ARIA tree, assigns sequential refs: @e1, @e2, @e3...
+4. For each ref, builds a Playwright Locator: getByRole(role, { name }).nth(index)
+5. Stores Map<string, RefEntry> on the BrowserManager instance (role + name + Locator)
+6. Returns the annotated tree as plain text
 
-後で:
-7. エージェント実行: $B click @e3
-8. サーバーが@e3を解決 → Locator → locator.click()
+Later:
+7. Agent runs: $B click @e3
+8. Server resolves @e3 → Locator → locator.click()
 ```
 
-### なぜLocatorであってDOM変更ではないのか
+### Why Locators, not DOM mutation
 
-明白なアプローチは`data-ref="@e1"`属性をDOMに注入することです。これは以下で壊れます：
+The obvious approach is to inject `data-ref="@e1"` attributes into the DOM. This breaks on:
 
-- **CSP（Content Security Policy）。** 多くの本番サイトがスクリプトからのDOM変更をブロックします。
-- **React/Vue/Svelteのハイドレーション。** フレームワークの差分検出が注入された属性を除去する可能性があります。
-- **Shadow DOM。** 外部からシャドウルート内にアクセスできません。
+- **CSP (Content Security Policy).** Many production sites block DOM modification from scripts.
+- **React/Vue/Svelte hydration.** Framework reconciliation can strip injected attributes.
+- **Shadow DOM.** Can't reach inside shadow roots from the outside.
 
-Playwright LocatorはDOMの外部にあります。アクセシビリティツリー（Chromiumが内部的に維持）と`getByRole()`クエリを使用します。DOM変更なし、CSP問題なし、フレームワーク競合なし。
+Playwright Locators are external to the DOM. They use the accessibility tree (which Chromium maintains internally) and `getByRole()` queries. No DOM mutation, no CSP issues, no framework conflicts.
 
-### refのライフサイクル
+### Ref lifecycle
 
-refはナビゲーション時（メインフレームの`framenavigated`イベント）にクリアされます。これは正しい動作です — ナビゲーション後、すべてのLocatorは古くなります。エージェントは新しいrefを取得するために再度`snapshot`を実行する必要があります。これは設計通りです：古いrefは間違った要素をクリックするのではなく、大きな音で失敗すべきです。
+Refs are cleared on navigation (the `framenavigated` event on the main frame). This is correct — after navigation, all locators are stale. The agent must run `snapshot` again to get fresh refs. This is by design: stale refs should fail loudly, not click the wrong element.
 
-### ref鮮度検出
+### Ref staleness detection
 
-SPAは`framenavigated`をトリガーせずにDOMを変更できます（Reactルーターのトランジション、タブ切り替え、モーダルのオープンなど）。これにより、ページURLが変わっていなくてもrefが古くなります。これをキャッチするために、`resolveRef()`はrefを使用する前に非同期の`count()`チェックを実行します：
+SPAs can mutate the DOM without triggering `framenavigated` (e.g. React router transitions, tab switches, modal opens). This makes refs stale even though the page URL didn't change. To catch this, `resolveRef()` performs an async `count()` check before using any ref:
 
 ```
 resolveRef(@e3) → entry = refMap.get("e3")
@@ -153,99 +153,101 @@ resolveRef(@e3) → entry = refMap.get("e3")
                 → if count > 0: return { locator }
 ```
 
-これにより、Playwrightの30秒アクションタイムアウトが切れるのを待つ代わりに、高速に失敗します（約5msのオーバーヘッド）。`RefEntry`はLocatorと共に`role`と`name`のメタデータを保存しているため、エラーメッセージはその要素が何であったかをエージェントに伝えることができます。
+This fails fast (~5ms overhead) instead of letting Playwright's 30-second action timeout expire on a missing element. The `RefEntry` stores `role` and `name` metadata alongside the Locator so the error message can tell the agent what the element was.
 
-### カーソルインタラクティブref（@c）
+### Cursor-interactive refs (@c)
 
-`-C`フラグは、クリック可能だがARIAツリーにない要素を見つけます — `cursor: pointer`でスタイルされたもの、`onclick`属性を持つ要素、カスタム`tabindex`を持つ要素。これらは`@c1`、`@c2` refを別のネームスペースで取得します。これにより、フレームワークが`<div>`としてレンダリングするが実際にはボタンであるカスタムコンポーネントをキャッチします。
+The `-C` flag finds elements that are clickable but not in the ARIA tree — things styled with `cursor: pointer`, elements with `onclick` attributes, or custom `tabindex`. These get `@c1`, `@c2` refs in a separate namespace. This catches custom components that frameworks render as `<div>` but are actually buttons.
 
-## ロギングアーキテクチャ
+## Logging architecture
 
-3つのリングバッファ（各50,000エントリ、O(1)プッシュ）：
+Three ring buffers (50,000 entries each, O(1) push):
 
 ```
 Browser events → CircularBuffer (in-memory) → Async flush to .gstack/*.log
 ```
 
-コンソールメッセージ、ネットワークリクエスト、ダイアログイベントにはそれぞれ独自のバッファがあります。フラッシュは1秒ごとに行われます — サーバーは最後のフラッシュ以降の新しいエントリのみを追加します。これは：
+Console messages, network requests, and dialog events each have their own buffer. Flushing happens every 1 second — the server appends only new entries since the last flush. This means:
 
-- HTTPリクエスト処理がディスクI/Oでブロックされない
-- ログがサーバークラッシュを生き残る（最大1秒のデータロス）
-- メモリが制限される（50Kエントリ × 3バッファ）
-- ディスクファイルは追記専用で、外部ツールから読み取り可能
+- HTTP request handling is never blocked by disk I/O
+- Logs survive server crashes (up to 1 second of data loss)
+- Memory is bounded (50K entries × 3 buffers)
+- Disk files are append-only, readable by external tools
 
-`console`、`network`、`dialog`コマンドはインメモリバッファから読み取り、ディスクからは読み取りません。ディスクファイルは事後デバッグ用です。
+The `console`, `network`, and `dialog` commands read from the in-memory buffers, not disk. Disk files are for post-mortem debugging.
 
-## SKILL.mdテンプレートシステム
+## SKILL.md template system
 
-### 問題
+### The problem
 
-SKILL.mdファイルは、browseコマンドの使い方をClaudeに伝えます。ドキュメントに存在しないフラグが記載されていたり、追加されたコマンドが欠落していると、エージェントがエラーに遭遇します。手動管理されたドキュメントは常にコードからドリフトします。
+SKILL.md files tell Claude how to use the browse commands. If the docs list a flag that doesn't exist, or miss a command that was added, the agent hits errors. Hand-maintained docs always drift from code.
 
-### 解決策
+### The solution
 
 ```
-SKILL.md.tmpl          (人間が書いた文章 + プレースホルダー)
+SKILL.md.tmpl          (human-written prose + placeholders)
        ↓
-gen-skill-docs.ts      (ソースコードのメタデータを読み取り)
+gen-skill-docs.ts      (reads source code metadata)
        ↓
-SKILL.md               (コミット済み、自動生成セクション)
+SKILL.md               (committed, auto-generated sections)
 ```
 
-テンプレートには、人間の判断を要するワークフロー、ヒント、例が含まれています。プレースホルダーはビルド時にソースコードから埋められます：
+Templates contain the workflows, tips, and examples that require human judgment. Placeholders are filled from source code at build time:
 
-| プレースホルダー | ソース | 生成内容 |
-|-----------------|--------|----------|
-| `{{COMMAND_REFERENCE}}` | `commands.ts` | カテゴリ別コマンドテーブル |
-| `{{SNAPSHOT_FLAGS}}` | `snapshot.ts` | 例付きフラグリファレンス |
-| `{{PREAMBLE}}` | `gen-skill-docs.ts` | 起動ブロック：更新チェック、セッション追跡、コントリビューターモード、AskUserQuestion形式 |
-| `{{BROWSE_SETUP}}` | `gen-skill-docs.ts` | バイナリ検出 + セットアップ手順 |
-| `{{BASE_BRANCH_DETECT}}` | `gen-skill-docs.ts` | PR対象スキル用の動的ベースブランチ検出（ship、review、qa、plan-ceo-review） |
-| `{{QA_METHODOLOGY}}` | `gen-skill-docs.ts` | /qaと/qa-only用の共有QA手法ブロック |
-| `{{DESIGN_METHODOLOGY}}` | `gen-skill-docs.ts` | /plan-design-reviewと/design-review用の共有デザイン監査手法 |
-| `{{REVIEW_DASHBOARD}}` | `gen-skill-docs.ts` | /ship事前チェック用のレビュー準備ダッシュボード |
-| `{{TEST_BOOTSTRAP}}` | `gen-skill-docs.ts` | /qa、/ship、/design-review用のテストフレームワーク検出、ブートストラップ、CI/CDセットアップ |
-| `{{CODEX_PLAN_REVIEW}}` | `gen-skill-docs.ts` | /plan-ceo-reviewと/plan-eng-review用のオプションのクロスモデルプランレビュー（CodexまたはClaude subagentフォールバック） |
+| Placeholder | Source | What it generates |
+|-------------|--------|-------------------|
+| `{{COMMAND_REFERENCE}}` | `commands.ts` | Categorized command table |
+| `{{SNAPSHOT_FLAGS}}` | `snapshot.ts` | Flag reference with examples |
+| `{{PREAMBLE}}` | `gen-skill-docs.ts` | Startup block: update check, session tracking, contributor mode, AskUserQuestion format |
+| `{{BROWSE_SETUP}}` | `gen-skill-docs.ts` | Binary discovery + setup instructions |
+| `{{BASE_BRANCH_DETECT}}` | `gen-skill-docs.ts` | Dynamic base branch detection for PR-targeting skills (ship, review, qa, plan-ceo-review) |
+| `{{QA_METHODOLOGY}}` | `gen-skill-docs.ts` | Shared QA methodology block for /qa and /qa-only |
+| `{{DESIGN_METHODOLOGY}}` | `gen-skill-docs.ts` | Shared design audit methodology for /plan-design-review and /design-review |
+| `{{REVIEW_DASHBOARD}}` | `gen-skill-docs.ts` | Review Readiness Dashboard for /ship pre-flight |
+| `{{TEST_BOOTSTRAP}}` | `gen-skill-docs.ts` | Test framework detection, bootstrap, CI/CD setup for /qa, /ship, /design-review |
+| `{{CODEX_PLAN_REVIEW}}` | `gen-skill-docs.ts` | Optional cross-model plan review (Codex or Claude subagent fallback) for /plan-ceo-review and /plan-eng-review |
+| `{{DESIGN_SETUP}}` | `resolvers/design.ts` | Discovery pattern for `$D` design binary, mirrors `{{BROWSE_SETUP}}` |
+| `{{DESIGN_SHOTGUN_LOOP}}` | `resolvers/design.ts` | Shared comparison board feedback loop for /design-shotgun, /plan-design-review, /design-consultation |
 
-これは構造的に健全です — コマンドがコードに存在すればドキュメントに表示されます。存在しなければ表示できません。
+This is structurally sound — if a command exists in code, it appears in docs. If it doesn't exist, it can't appear.
 
-### プリアンブル
+### The preamble
 
-すべてのスキルは`{{PREAMBLE}}`ブロックで始まり、スキル固有のロジックの前に実行されます。1つのbashコマンドで5つのことを処理します：
+Every skill starts with a `{{PREAMBLE}}` block that runs before the skill's own logic. It handles five things in a single bash command:
 
-1. **更新チェック** — `gstack-update-check`を呼び出し、アップグレードが利用可能かを報告。
-2. **セッション追跡** — `~/.gstack/sessions/$PPID`をタッチし、アクティブセッション数（過去2時間以内に変更されたファイル）をカウント。3+セッション実行中は、すべてのスキルが「ELI16モード」に入り — ウィンドウを行き来しているユーザーにコンテキストを再説明。
-3. **コントリビューターモード** — configから`gstack_contributor`を読み取り。trueの場合、gstack自体が不具合を起こした時にエージェントが`~/.gstack/contributor-logs/`にカジュアルなフィールドレポートを提出。
-4. **AskUserQuestion形式** — 統一形式：コンテキスト、質問、`RECOMMENDATION: Choose X because ___`、選択肢。全スキルで一貫。
-5. **作る前に探せ** — インフラや馴染みのないパターンを構築する前にまず検索。知識の3層：実績あるもの（第1層）、新しくて人気のあるもの（第2層）、第一原理（第3層）。第一原理の推論で従来の常識が間違っていることが判明した場合、エージェントは「ユーレカの瞬間」を命名してログに記録。完全なビルダー哲学については`ETHOS.md`を参照。
+1. **Update check** — calls `gstack-update-check`, reports if an upgrade is available.
+2. **Session tracking** — touches `~/.gstack/sessions/$PPID` and counts active sessions (files modified in the last 2 hours). When 3+ sessions are running, all skills enter "ELI16 mode" — every question re-grounds the user on context because they're juggling windows.
+3. **Contributor mode** — reads `gstack_contributor` from config. When true, the agent files casual field reports to `~/.gstack/contributor-logs/` when gstack itself misbehaves.
+4. **AskUserQuestion format** — universal format: context, question, `RECOMMENDATION: Choose X because ___`, lettered options. Consistent across all skills.
+5. **Search Before Building** — before building infrastructure or unfamiliar patterns, search first. Three layers of knowledge: tried-and-true (Layer 1), new-and-popular (Layer 2), first-principles (Layer 3). When first-principles reasoning reveals conventional wisdom is wrong, the agent names the "eureka moment" and logs it. See `ETHOS.md` for the full builder philosophy.
 
-### なぜコミット済みで、ランタイム生成ではないのか？
+### Why committed, not generated at runtime?
 
-3つの理由：
+Three reasons:
 
-1. **ClaudeはSKILL.mdをスキルロード時に読み取ります。** ユーザーが`/browse`を呼び出す時にビルドステップはありません。ファイルはすでに存在し、正確でなければなりません。
-2. **CIが鮮度を検証できます。** `gen:skill-docs --dry-run` + `git diff --exit-code`でマージ前に古いドキュメントをキャッチ。
-3. **git blameが機能します。** コマンドがいつ、どのコミットで追加されたかを確認できます。
+1. **Claude reads SKILL.md at skill load time.** There's no build step when a user invokes `/browse`. The file must already exist and be correct.
+2. **CI can validate freshness.** `gen:skill-docs --dry-run` + `git diff --exit-code` catches stale docs before merge.
+3. **Git blame works.** You can see when a command was added and in which commit.
 
-### テンプレートのテスト層
+### Template test tiers
 
-| 層 | 内容 | コスト | 速度 |
-|----|------|--------|------|
-| 1 — 静的検証 | SKILL.md内の全`$B`コマンドをパースし、レジストリに対して検証 | 無料 | 2秒未満 |
-| 2 — E2E（`claude -p`経由） | 実際のClaudeセッションを起動し、各スキルを実行、エラーチェック | 約$3.85 | 約20分 |
-| 3 — LLMジャッジ | Sonnetがドキュメントの明確さ/完全性/実行可能性を評価 | 約$0.15 | 約30秒 |
+| Tier | What | Cost | Speed |
+|------|------|------|-------|
+| 1 — Static validation | Parse every `$B` command in SKILL.md, validate against registry | Free | <2s |
+| 2 — E2E via `claude -p` | Spawn real Claude session, run each skill, check for errors | ~$3.85 | ~20min |
+| 3 — LLM-as-judge | Sonnet scores docs on clarity/completeness/actionability | ~$0.15 | ~30s |
 
-Tier 1は`bun test`ごとに実行。Tier 2+3は`EVALS=1`の環境変数でゲート。アイデア：95%の問題を無料でキャッチし、LLMは判断が必要な場合のみ使用。
+Tier 1 runs on every `bun test`. Tiers 2+3 are gated behind `EVALS=1`. The idea is: catch 95% of issues for free, use LLMs only for judgment calls.
 
-## コマンドディスパッチ
+## Command dispatch
 
-コマンドは副作用で分類されます：
+Commands are categorized by side effects:
 
-- **READ**（text、html、links、console、cookies、...）：変更なし。リトライ安全。ページ状態を返す。
-- **WRITE**（goto、click、fill、press、...）：ページ状態を変更。冪等ではない。
-- **META**（snapshot、screenshot、tabs、chain、...）：read/writeにきれいに分類できないサーバーレベルの操作。
+- **READ** (text, html, links, console, cookies, ...): No mutations. Safe to retry. Returns page state.
+- **WRITE** (goto, click, fill, press, ...): Mutates page state. Not idempotent.
+- **META** (snapshot, screenshot, tabs, chain, ...): Server-level operations that don't fit neatly into read/write.
 
-これは単なる整理ではありません。サーバーがディスパッチに使用します：
+This isn't just organizational. The server uses it for dispatch:
 
 ```typescript
 if (READ_COMMANDS.has(cmd))  → handleReadCommand(cmd, args, bm)
@@ -253,42 +255,42 @@ if (WRITE_COMMANDS.has(cmd)) → handleWriteCommand(cmd, args, bm)
 if (META_COMMANDS.has(cmd))  → handleMetaCommand(cmd, args, bm, shutdown)
 ```
 
-`help`コマンドは3つのセットすべてを返し、エージェントが利用可能なコマンドを自己発見できるようにします。
+The `help` command returns all three sets so agents can self-discover available commands.
 
-## エラーの哲学
+## Error philosophy
 
-エラーは人間ではなく、AIエージェントのためのものです。すべてのエラーメッセージはアクショナブルでなければなりません：
+Errors are for AI agents, not humans. Every error message must be actionable:
 
 - "Element not found" → "Element not found or not interactable. Run `snapshot -i` to see available elements."
 - "Selector matched multiple elements" → "Selector matched multiple elements. Use @refs from `snapshot` instead."
 - Timeout → "Navigation timed out after 30s. The page may be slow or the URL may be wrong."
 
-Playwrightのネイティブエラーは`wrapError()`を通じて書き換えられ、内部スタックトレースを除去してガイダンスを追加します。エージェントはエラーを読んで、人間の介入なしに次に何をすべきかを知れるべきです。
+Playwright's native errors are rewritten through `wrapError()` to strip internal stack traces and add guidance. The agent should be able to read the error and know what to do next without human intervention.
 
-### クラッシュリカバリ
+### Crash recovery
 
-サーバーは自己修復を試みません。Chromiumがクラッシュした場合（`browser.on('disconnected')`）、サーバーは即座に終了します。CLIは次のコマンドでデッドサーバーを検出し、自動再起動します。半死状態のブラウザプロセスに再接続しようとするよりも、これはシンプルで信頼性が高いです。
+The server doesn't try to self-heal. If Chromium crashes (`browser.on('disconnected')`), the server exits immediately. The CLI detects the dead server on the next command and auto-restarts. This is simpler and more reliable than trying to reconnect to a half-dead browser process.
 
-## E2Eテストインフラストラクチャ
+## E2E test infrastructure
 
-### セッションランナー（`test/helpers/session-runner.ts`）
+### Session runner (`test/helpers/session-runner.ts`)
 
-E2Eテストは`claude -p`を完全に独立したサブプロセスとして起動します — Agent SDK経由ではなく（Claude Codeセッション内でネストできません）。ランナーは：
+E2E tests spawn `claude -p` as a completely independent subprocess — not via the Agent SDK, which can't nest inside Claude Code sessions. The runner:
 
-1. プロンプトを一時ファイルに書き込む（シェルエスケープの問題を回避）
-2. `sh -c 'cat prompt | claude -p --output-format stream-json --verbose'`を起動
-3. stdoutからNDJSONをストリームしてリアルタイム進捗を取得
-4. 設定可能なタイムアウトとレースする
-5. 完全なNDJSONトランスクリプトを構造化結果にパース
+1. Writes the prompt to a temp file (avoids shell escaping issues)
+2. Spawns `sh -c 'cat prompt | claude -p --output-format stream-json --verbose'`
+3. Streams NDJSON from stdout for real-time progress
+4. Races against a configurable timeout
+5. Parses the full NDJSON transcript into structured results
 
-`parseNDJSON()`関数はピュアです — I/Oなし、副作用なし — 独立してテスト可能です。
+The `parseNDJSON()` function is pure — no I/O, no side effects — making it independently testable.
 
-### 可観測性データフロー
+### Observability data flow
 
 ```
   skill-e2e-*.test.ts
         │
-        │ runIdを生成し、各呼び出しにtestName + runIdを渡す
+        │ generates runId, passes testName + runId to each call
         │
   ┌─────┼──────────────────────────────┐
   │     │                              │
@@ -323,38 +325,38 @@ E2Eテストは`claude -p`を完全に独立したサブプロセスとして起
   │        (stale >10min? warn)
 ```
 
-**所有権の分離：** session-runnerがハートビート（現在のテスト状態）を所有し、eval-storeが部分結果（完了したテスト状態）を所有します。ウォッチャーは両方を読みます。どちらのコンポーネントも相手を知りません — ファイルシステムを通じてのみデータを共有します。
+**Split ownership:** session-runner owns the heartbeat (current test state), eval-store owns partial results (completed test state). The watcher reads both. Neither component knows about the other — they share data only through the filesystem.
 
-**すべてが非致命的：** すべての可観測性I/Oはtry/catchでラップされています。書き込み失敗がテストの失敗を引き起こすことはありません。テスト自体が真実の源です。可観測性はベストエフォートです。
+**Non-fatal everything:** All observability I/O is wrapped in try/catch. A write failure never causes a test to fail. The tests themselves are the source of truth; observability is best-effort.
 
-**機械可読診断：** 各テスト結果には`exit_reason`（success、timeout、error_max_turns、error_api、exit_code_N）、`timeout_at_turn`、`last_tool_call`が含まれます。これにより`jq`クエリが可能です：
+**Machine-readable diagnostics:** Each test result includes `exit_reason` (success, timeout, error_max_turns, error_api, exit_code_N), `timeout_at_turn`, and `last_tool_call`. This enables `jq` queries like:
 ```bash
 jq '.tests[] | select(.exit_reason == "timeout") | .last_tool_call' ~/.gstack-dev/evals/_partial-e2e.json
 ```
 
-### 評価永続化（`test/helpers/eval-store.ts`）
+### Eval persistence (`test/helpers/eval-store.ts`)
 
-`EvalCollector`はテスト結果を蓄積し、2つの方法で書き込みます：
+The `EvalCollector` accumulates test results and writes them in two ways:
 
-1. **インクリメンタル：** `savePartial()`が各テスト後に`_partial-e2e.json`を書き込みます（アトミック：`.tmp`に書き込み、`fs.renameSync`）。killを生き残ります。
-2. **最終：** `finalize()`がタイムスタンプ付き評価ファイル（例：`e2e-20260314-143022.json`）を書き込みます。部分ファイルはクリーンアップされません — 可観測性のために最終ファイルと共に永続化されます。
+1. **Incremental:** `savePartial()` writes `_partial-e2e.json` after each test (atomic: write `.tmp`, `fs.renameSync`). Survives kills.
+2. **Final:** `finalize()` writes a timestamped eval file (e.g. `e2e-20260314-143022.json`). The partial file is never cleaned up — it persists alongside the final file for observability.
 
-`eval:compare`は2つの評価実行を比較します。`eval:summary`は`~/.gstack-dev/evals/`内のすべての実行の統計を集約します。
+`eval:compare` diffs two eval runs. `eval:summary` aggregates stats across all runs in `~/.gstack-dev/evals/`.
 
-### テスト層
+### Test tiers
 
-| 層 | 内容 | コスト | 速度 |
-|----|------|--------|------|
-| 1 — 静的検証 | `$B`コマンドのパース、レジストリ検証、可観測性ユニットテスト | 無料 | 5秒未満 |
-| 2 — E2E（`claude -p`経由） | 実際のClaudeセッションを起動、各スキルを実行、エラースキャン | 約$3.85 | 約20分 |
-| 3 — LLMジャッジ | Sonnetがドキュメントの明確さ/完全性/実行可能性を評価 | 約$0.15 | 約30秒 |
+| Tier | What | Cost | Speed |
+|------|------|------|-------|
+| 1 — Static validation | Parse `$B` commands, validate against registry, observability unit tests | Free | <5s |
+| 2 — E2E via `claude -p` | Spawn real Claude session, run each skill, scan for errors | ~$3.85 | ~20min |
+| 3 — LLM-as-judge | Sonnet scores docs on clarity/completeness/actionability | ~$0.15 | ~30s |
 
-Tier 1は`bun test`ごとに実行。Tier 2+3は`EVALS=1`でゲート。アイデア：95%の問題を無料でキャッチし、LLMは判断呼び出しと統合テストにのみ使用。
+Tier 1 runs on every `bun test`. Tiers 2+3 are gated behind `EVALS=1`. The idea: catch 95% of issues for free, use LLMs only for judgment calls and integration testing.
 
-## 意図的に含まれていないもの
+## What's intentionally not here
 
-- **WebSocketストリーミングなし。** HTTPリクエスト/レスポンスはよりシンプルで、curlでデバッグでき、十分高速。ストリーミングは限界的な利益のために複雑さを追加。
-- **MCPプロトコルなし。** MCPはリクエストごとにJSONスキーマオーバーヘッドを追加し、永続的接続が必要。プレーンHTTP + プレーンテキスト出力はトークンが軽くデバッグも簡単。
-- **マルチユーザーサポートなし。** ワークスペースごとに1サーバー、1ユーザー。トークン認証は多層防御であり、マルチテナンシーではない。
-- **Windows/Linux Cookie復号なし。** macOS Keychainのみサポート。Linux（GNOME Keyring/kwallet）とWindows（DPAPI）はアーキテクチャ的に可能だが未実装。
-- **iframeサポートなし。** Playwrightはiframeを処理できるが、refシステムはまだフレーム境界を越えない。これが最もリクエストの多い未実装機能。
+- **No WebSocket streaming.** HTTP request/response is simpler, debuggable with curl, and fast enough. Streaming would add complexity for marginal benefit.
+- **No MCP protocol.** MCP adds JSON schema overhead per request and requires a persistent connection. Plain HTTP + plain text output is lighter on tokens and easier to debug.
+- **No multi-user support.** One server per workspace, one user. The token auth is defense-in-depth, not multi-tenancy.
+- **No Windows/Linux cookie decryption.** macOS Keychain is the only supported credential store. Linux (GNOME Keyring/kwallet) and Windows (DPAPI) are architecturally possible but not implemented.
+- **No iframe auto-discovery.** `$B frame` supports cross-frame interaction (CSS selector, @ref, `--name`, `--url` matching), but the ref system does not auto-crawl iframes during `snapshot`. You must explicitly enter a frame context first.
